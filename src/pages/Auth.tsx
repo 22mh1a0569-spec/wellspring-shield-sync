@@ -56,12 +56,22 @@ function RoleCard({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={
-        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border bg-card p-5 text-center shadow-soft transition hover-scale " +
-        (active ? "ring-2 ring-ring bg-accent" : "hover:bg-accent/60")
+        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border p-5 text-center shadow-soft transition hover-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 " +
+        (active
+          ? "border-primary bg-accent ring-2 ring-primary"
+          : "border-border bg-card hover:bg-accent/60")
       }
     >
-      <div className={"grid h-10 w-10 place-items-center rounded-full " + (active ? "bg-background" : "bg-secondary")}>{icon}</div>
+      <div
+        className={
+          "grid h-10 w-10 place-items-center rounded-full " +
+          (active ? "bg-primary/10" : "bg-secondary")
+        }
+      >
+        {icon}
+      </div>
       <div className="text-sm font-semibold">{title}</div>
     </button>
   );
