@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/providers/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 
 type Tx = {
@@ -32,20 +34,35 @@ async function sha256(text: string) {
 
 export default function VerifyRecord() {
   const { txId = "" } = useParams();
+  const { session, role, loading } = useAuth();
   const [tx, setTx] = useState<Tx | null>(null);
   const [pred, setPred] = useState<Pred | null>(null);
-  const [status, setStatus] = useState<"loading" | "valid" | "invalid" | "notfound">("loading");
+  const [status, setStatus] = useState<
+    "loading" | "valid" | "invalid" | "notfound" | "auth_required" | "no_access"
+  >("loading");
 
   useEffect(() => {
     const run = async () => {
+      setTx(null);
+      setPred(null);
+
+      if (loading) return;
+
+      // Integrity links (QR / hash) are shareable, but report content requires authentication.
+      if (!session) {
+        setStatus("auth_required");
+        return;
+      }
+
       const { data: txRow } = await supabase
         .from("ledger_transactions")
         .select("tx_id,payload_hash,prev_hash,created_at,prediction_id,patient_id")
         .eq("tx_id", txId)
         .maybeSingle();
 
+      // With RLS, lack of permission may look like "not found". Treat as "no_access" for signed-in users.
       if (!txRow) {
-        setStatus("notfound");
+        setStatus("no_access");
         return;
       }
 
@@ -58,7 +75,7 @@ export default function VerifyRecord() {
         .maybeSingle();
 
       if (!predRow) {
-        setStatus("invalid");
+        setStatus("no_access");
         return;
       }
       setPred(predRow as any);
@@ -76,9 +93,16 @@ export default function VerifyRecord() {
     };
 
     run();
-  }, [txId]);
+  }, [txId, session, loading]);
 
   const banner = useMemo(() => {
+    if (status === "auth_required")
+      return { title: "Sign in required", desc: "Please sign in to view and verify this report." };
+    if (status === "no_access")
+      return {
+        title: "No access",
+        desc: "You are signed in, but you don't have permission to view this patient's report yet.",
+      };
     if (status === "valid") return { title: "Verified", desc: "The record hash matches the ledger transaction." };
     if (status === "invalid") return { title: "Not verified", desc: "The record does not match the stored hash." };
     if (status === "notfound") return { title: "Transaction not found", desc: "No ledger transaction matches this ID." };
@@ -98,6 +122,24 @@ export default function VerifyRecord() {
                 <ShieldCheck className="h-4 w-4" /> {banner.title}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">{banner.desc}</div>
+
+              {status === "auth_required" ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button asChild variant="hero" className="rounded-xl">
+                    <Link to="/auth" state={{ from: `/verify/${txId}` }}>
+                      Sign in
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+
+              {status === "no_access" && role === "doctor" ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button asChild variant="outline" className="rounded-xl">
+                    <Link to="/doctor/telemedicine">Open Telemedicine</Link>
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             {tx ? (
