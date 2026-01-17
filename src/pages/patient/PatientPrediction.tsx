@@ -10,17 +10,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "@/hooks/use-toast";
 
 // NOTE: lightweight deterministic scorer (demo-friendly).
 const schema = z.object({
+  age_years: z.coerce.number().int().min(1).max(120),
+
   heart_rate: z.coerce.number().min(30).max(220),
   systolic_bp: z.coerce.number().min(70).max(220),
   diastolic_bp: z.coerce.number().min(40).max(140),
+
   glucose_mgdl: z.coerce.number().min(50).max(400),
+  cholesterol_mgdl: z.coerce.number().min(80).max(400),
+  bmi: z.coerce.number().min(10).max(60),
   temperature_c: z.coerce.number().min(34).max(42),
+
+  physical_activity_level: z.enum(["sedentary", "light", "moderate", "high"]),
+  smoking: z.coerce.boolean(),
+  regular_alcohol: z.coerce.boolean(),
+  family_history: z.coerce.boolean(),
 });
 
 type Inputs = z.infer<typeof schema>;
@@ -31,10 +49,40 @@ function clamp(n: number, a: number, b: number) {
 
 function computeScore(input: Inputs) {
   let score = 100;
-  score -= clamp(Math.abs(input.heart_rate - 72) * 0.6, 0, 18);
-  score -= clamp(Math.abs(input.systolic_bp - 120) * 0.25 + Math.abs(input.diastolic_bp - 80) * 0.2, 0, 20);
-  score -= clamp(Math.max(0, input.glucose_mgdl - 110) * 0.25, 0, 22);
-  score -= clamp(Math.abs(input.temperature_c - 36.8) * 10, 0, 20);
+
+  // Vital signs
+  score -= clamp(Math.abs(input.heart_rate - 72) * 0.5, 0, 15);
+  score -= clamp(
+    Math.abs(input.systolic_bp - 120) * 0.22 +
+      Math.abs(input.diastolic_bp - 80) * 0.18,
+    0,
+    18
+  );
+
+  // Blood tests
+  score -= clamp(Math.max(0, input.glucose_mgdl - 110) * 0.2, 0, 20);
+  score -= clamp(Math.max(0, input.cholesterol_mgdl - 200) * 0.05, 0, 12);
+
+  // BMI
+  if (input.bmi < 18.5) score -= clamp((18.5 - input.bmi) * 1.2, 0, 10);
+  if (input.bmi > 25) score -= clamp((input.bmi - 25) * 1.2, 0, 18);
+
+  // Temperature
+  score -= clamp(Math.abs(input.temperature_c - 36.8) * 8, 0, 18);
+
+  // Age (simple linear penalty after 40)
+  score -= clamp(Math.max(0, input.age_years - 40) * 0.5, 0, 15);
+
+  // Lifestyle factors
+  if (input.smoking) score -= 10;
+  if (input.regular_alcohol) score -= 6;
+  if (input.family_history) score -= 8;
+
+  // Activity (protective)
+  if (input.physical_activity_level === "sedentary") score -= 8;
+  if (input.physical_activity_level === "light") score -= 4;
+  if (input.physical_activity_level === "high") score += 3;
+
   return clamp(Math.round(score), 0, 100);
 }
 
@@ -58,11 +106,21 @@ export default function PatientPrediction() {
   const [busy, setBusy] = useState(false);
 
   const [form, setForm] = useState<Inputs>({
-    heart_rate: 76,
-    systolic_bp: 126,
-    diastolic_bp: 82,
-    glucose_mgdl: 108,
-    temperature_c: 36.9,
+    age_years: 35,
+
+    heart_rate: 72,
+    systolic_bp: 120,
+    diastolic_bp: 80,
+
+    glucose_mgdl: 95,
+    cholesterol_mgdl: 180,
+    bmi: 24.5,
+    temperature_c: 36.8,
+
+    physical_activity_level: "moderate",
+    smoking: false,
+    regular_alcohol: false,
+    family_history: false,
   });
 
   const score = useMemo(() => computeScore(form), [form]);
@@ -148,12 +206,19 @@ export default function PatientPrediction() {
 
     doc.text("Inputs", 14, 68);
     const lines = [
-      `Heart rate: ${form.heart_rate}`,
+      `Age: ${form.age_years} years`,
       `Blood pressure: ${form.systolic_bp}/${form.diastolic_bp}`,
+      `Heart rate: ${form.heart_rate} bpm`,
       `Glucose: ${form.glucose_mgdl} mg/dL`,
+      `Cholesterol: ${form.cholesterol_mgdl} mg/dL`,
+      `BMI: ${form.bmi}`,
       `Temperature: ${form.temperature_c} °C`,
+      `Physical activity: ${form.physical_activity_level}`,
+      `Smoking: ${form.smoking ? "Yes" : "No"}`,
+      `Regular alcohol: ${form.regular_alcohol ? "Yes" : "No"}`,
+      `Family history: ${form.family_history ? "Yes" : "No"}`,
     ];
-    lines.forEach((l, i) => doc.text(l, 14, 76 + i * 8));
+    lines.forEach((l, i) => doc.text(l, 14, 76 + i * 7));
 
     if (remarks.trim()) {
       doc.text("Remarks", 14, 112);
@@ -185,31 +250,138 @@ export default function PatientPrediction() {
         <CardHeader>
           <CardTitle className="font-display">AI Disease Risk Prediction</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2">
-          <div className="grid gap-4">
-            {(
-              [
-                ["Heart rate", "heart_rate"],
-                ["Systolic BP", "systolic_bp"],
-                ["Diastolic BP", "diastolic_bp"],
-                ["Glucose (mg/dL)", "glucose_mgdl"],
-                ["Temperature (°C)", "temperature_c"],
-              ] as const
-            ).map(([label, key]) => (
-              <div key={key} className="space-y-2">
-                <Label>{label}</Label>
-                <Input
-                  value={(form as any)[key]}
-                  onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                  inputMode="decimal"
+          <CardContent className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-5">
+              <div className="grid gap-3">
+                <div className="text-sm font-medium">Vital Signs</div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Age (years)</Label>
+                    <Input
+                      value={form.age_years}
+                      onChange={(e) => setForm((p) => ({ ...p, age_years: e.target.value as any }))}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Blood Pressure (Systolic)</Label>
+                    <Input
+                      value={form.systolic_bp}
+                      onChange={(e) => setForm((p) => ({ ...p, systolic_bp: e.target.value as any }))}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Blood Pressure (Diastolic)</Label>
+                    <Input
+                      value={form.diastolic_bp}
+                      onChange={(e) => setForm((p) => ({ ...p, diastolic_bp: e.target.value as any }))}
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Heart Rate (bpm)</Label>
+                  <Input
+                    value={form.heart_rate}
+                    onChange={(e) => setForm((p) => ({ ...p, heart_rate: e.target.value as any }))}
+                    inputMode="numeric"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                <div className="text-sm font-medium">Blood Tests</div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Glucose (mg/dL)</Label>
+                    <Input
+                      value={form.glucose_mgdl}
+                      onChange={(e) => setForm((p) => ({ ...p, glucose_mgdl: e.target.value as any }))}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cholesterol (mg/dL)</Label>
+                    <Input
+                      value={form.cholesterol_mgdl}
+                      onChange={(e) => setForm((p) => ({ ...p, cholesterol_mgdl: e.target.value as any }))}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>BMI</Label>
+                    <Input
+                      value={form.bmi}
+                      onChange={(e) => setForm((p) => ({ ...p, bmi: e.target.value as any }))}
+                      inputMode="decimal"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Temperature (°C)</Label>
+                  <Input
+                    value={form.temperature_c}
+                    onChange={(e) => setForm((p) => ({ ...p, temperature_c: e.target.value as any }))}
+                    inputMode="decimal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                <div className="text-sm font-medium">Lifestyle Factors</div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Physical Activity Level</Label>
+                    <Select
+                      value={form.physical_activity_level}
+                      onValueChange={(v) => setForm((p) => ({ ...p, physical_activity_level: v as Inputs["physical_activity_level"] }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sedentary">Sedentary</SelectItem>
+                        <SelectItem value="light">Light (1–2 days/week)</SelectItem>
+                        <SelectItem value="moderate">Moderate (3–4 days/week)</SelectItem>
+                        <SelectItem value="high">High (5+ days/week)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-3 pt-1">
+                    <div className="flex items-center justify-between gap-3 rounded-xl border bg-card/70 px-4 py-3 shadow-soft">
+                      <div className="text-sm font-medium">Smoking</div>
+                      <Switch checked={form.smoking} onCheckedChange={(v) => setForm((p) => ({ ...p, smoking: v }))} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border bg-card/70 px-4 py-3 shadow-soft">
+                      <div className="text-sm font-medium">Regular Alcohol</div>
+                      <Switch
+                        checked={form.regular_alcohol}
+                        onCheckedChange={(v) => setForm((p) => ({ ...p, regular_alcohol: v }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border bg-card/70 px-4 py-3 shadow-soft">
+                      <div className="text-sm font-medium">Family History</div>
+                      <Switch
+                        checked={form.family_history}
+                        onCheckedChange={(v) => setForm((p) => ({ ...p, family_history: v }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Doctor remarks (optional)</Label>
+                <Textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Observations, advice, next steps…"
                 />
               </div>
-            ))}
-
-            <div className="space-y-2">
-              <Label>Doctor remarks (optional)</Label>
-              <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Observations, advice, next steps…" />
-            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button variant="hero" onClick={savePrediction} disabled={busy}>
