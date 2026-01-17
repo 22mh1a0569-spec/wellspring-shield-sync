@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { role, signOut, user } = useAuth();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
+  const [profile, setProfile] = useState<{ full_name: string | null; avatar_url: string | null } | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -54,6 +55,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .eq("user_id", user.id)
       .eq("is_read", false)
       .then(({ count }) => setUnread(count ?? 0));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setProfile(null);
+      return;
+    }
+
+    supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setProfile(data ? { full_name: data.full_name ?? null, avatar_url: (data as any).avatar_url ?? null } : null));
   }, [user?.id]);
 
   const nav = useMemo<NavItem[]>(() => {
@@ -130,7 +145,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <SidebarFooter>
             <div className="grid gap-2">
-              <UserSidebarCard name={null} email={user?.email ?? null} role={role ?? null} />
+              <UserSidebarCard
+                userId={user?.id ?? null}
+                name={profile?.full_name ?? null}
+                avatarUrl={profile?.avatar_url ?? null}
+                email={user?.email ?? null}
+                role={role ?? null}
+                onProfileUpdated={(next) => setProfile((prev) => ({ full_name: prev?.full_name ?? null, avatar_url: next.avatarUrl ?? prev?.avatar_url ?? null }))}
+              />
 
               <Button variant="outline" className="justify-between rounded-xl" asChild>
                 <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
