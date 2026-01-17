@@ -9,13 +9,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { HealthChainBrand } from "@/components/HealthChainBrand";
 
 const emailSchema = z.string().trim().email("Enter a valid email").max(255, "Email is too long");
 const passwordSchema = z.string().min(8, "Minimum 8 characters").max(128, "Password is too long");
 
 type Role = "patient" | "doctor";
+
+type FormNotice =
+  | {
+      variant: "default" | "destructive";
+      title: string;
+      description?: string;
+    }
+  | null;
 
 function humanizeError(err: unknown): string {
   if (err instanceof z.ZodError) return err.issues?.[0]?.message ?? "Please check your inputs.";
@@ -59,6 +67,16 @@ function RoleCard({
   );
 }
 
+function InlineNotice({ notice }: { notice: FormNotice }) {
+  if (!notice) return null;
+  return (
+    <Alert variant={notice.variant} className="mt-4 rounded-xl">
+      <AlertTitle>{notice.title}</AlertTitle>
+      {notice.description ? <AlertDescription>{notice.description}</AlertDescription> : null}
+    </Alert>
+  );
+}
+
 export default function AuthPage() {
   const nav = useNavigate();
   const [tab, setTab] = useState<"login" | "signup">("login");
@@ -69,6 +87,7 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [specialization, setSpecialization] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<FormNotice>(null);
 
   const subtitle = useMemo(
     () => (tab === "login" ? "Sign in to access your health dashboard" : "Join HealthChain for secure healthcare"),
@@ -83,6 +102,7 @@ export default function AuthPage() {
 
   const onLogin = async () => {
     setBusy(true);
+    setNotice(null);
     try {
       emailSchema.parse(email);
       passwordSchema.parse(password);
@@ -91,7 +111,11 @@ export default function AuthPage() {
       if (error) throw error;
       if (data.user?.id) await afterAuthRedirect(data.user.id);
     } catch (e: any) {
-      toast({ title: "Sign in failed", description: humanizeError(e), variant: "destructive" });
+      setNotice({
+        variant: "destructive",
+        title: "Sign in failed",
+        description: humanizeError(e),
+      });
     } finally {
       setBusy(false);
     }
@@ -99,6 +123,7 @@ export default function AuthPage() {
 
   const onSignup = async () => {
     setBusy(true);
+    setNotice(null);
     try {
       emailSchema.parse(email);
       passwordSchema.parse(password);
@@ -113,7 +138,11 @@ export default function AuthPage() {
 
       const userId = data.user?.id;
       if (!userId) {
-        toast({ title: "Check your email", description: "Finish signup using the link we sent." });
+        setNotice({
+          variant: "default",
+          title: "Check your email",
+          description: "Finish signup using the link we sent.",
+        });
         return;
       }
 
@@ -130,10 +159,13 @@ export default function AuthPage() {
         await supabase.from("doctor_availability").upsert({ doctor_id: userId, is_available: true });
       }
 
-      toast({ title: "Account created", description: "Welcome to HealthChain." });
       await afterAuthRedirect(userId);
     } catch (e: any) {
-      toast({ title: "Sign up failed", description: humanizeError(e), variant: "destructive" });
+      setNotice({
+        variant: "destructive",
+        title: "Sign up failed",
+        description: humanizeError(e),
+      });
     } finally {
       setBusy(false);
     }
@@ -178,7 +210,13 @@ export default function AuthPage() {
             </CardHeader>
 
             <CardContent>
-              <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+              <Tabs
+                value={tab}
+                onValueChange={(v) => {
+                  setTab(v as any);
+                  setNotice(null);
+                }}
+              >
                 <TabsList className="grid w-full grid-cols-2 rounded-xl bg-secondary">
                   <TabsTrigger value="login" className="rounded-lg">
                     Sign In
@@ -240,6 +278,8 @@ export default function AuthPage() {
                     <Button variant="hero" className="h-12 w-full rounded-xl" disabled={busy} onClick={onSignup}>
                       {busy ? "Creating…" : "Create Account"}
                     </Button>
+
+                    <InlineNotice notice={notice} />
                   </TabsContent>
 
                   <TabsContent value="login" className="m-0 space-y-5">
@@ -280,6 +320,8 @@ export default function AuthPage() {
                     <Button variant="hero" className="h-12 w-full rounded-xl" disabled={busy} onClick={onLogin}>
                       {busy ? "Signing in…" : "Sign In"}
                     </Button>
+
+                    <InlineNotice notice={notice} />
                   </TabsContent>
                 </div>
               </Tabs>
