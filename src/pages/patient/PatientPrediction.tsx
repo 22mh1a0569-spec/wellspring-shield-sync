@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { QRCodeSVG } from "qrcode.react";
+import QRCode from "qrcode";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { FileDown } from "lucide-react";
@@ -102,6 +103,46 @@ async function sha256(text: string) {
     .join("");
 }
 
+async function qrPngDataUrl(value: string) {
+  return QRCode.toDataURL(value, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 256,
+    color: { dark: "#000000", light: "#FFFFFF" },
+  });
+}
+
+async function addVerificationBlock(doc: jsPDF, opts: { txId: string; createdAtIso?: string }) {
+  const { txId, createdAtIso } = opts;
+  const verifyUrl = `${window.location.origin}/verify/${txId}`;
+  const qr = await qrPngDataUrl(verifyUrl);
+
+  const startY = 148;
+  doc.setFontSize(12);
+  doc.text("Verification (integrity proof)", 14, startY);
+
+  doc.setFontSize(10);
+  const explanation =
+    "What is verified: this PDF links to a ledger transaction that anchors a SHA-256 hash of the report payload (inputs + risk + score + timestamp). The verification page recomputes the hash and compares it with the stored value.";
+  doc.text(doc.splitTextToSize(explanation, 120), 14, startY + 8);
+
+  const metaY = startY + 34;
+  doc.text(`Transaction ID: ${txId}`, 14, metaY);
+  if (createdAtIso) doc.text(`Report timestamp: ${new Date(createdAtIso).toLocaleString()}`, 14, metaY + 6);
+  doc.text(`Verify URL: ${verifyUrl}`, 14, metaY + 12);
+
+  // QR (right side)
+  doc.addImage(qr, "PNG", 155, startY + 6, 40, 40);
+  doc.setFontSize(8);
+  doc.text("Scan to verify", 163, startY + 50);
+
+  // Privacy disclaimer
+  const privacy =
+    "Privacy: Scanning opens a secure verification page. Full report details require sign-in and patient consent. Do not share this PDF publicly.";
+  doc.setFontSize(9);
+  doc.text(doc.splitTextToSize(privacy, 180), 14, 286);
+}
+
 type PredictionHistoryRow = {
   id: string;
   created_at: string;
@@ -121,7 +162,7 @@ function safeDateMs(d: string) {
   return Number.isFinite(ms) ? ms : null;
 }
 
-function downloadPredictionPdfFromRow(opts: {
+async function downloadPredictionPdfFromRow(opts: {
   email: string;
   prediction: PredictionHistoryRow;
   txId?: string | null;
@@ -134,11 +175,7 @@ function downloadPredictionPdfFromRow(opts: {
   doc.setFontSize(11);
   doc.text(`Patient: ${email}`, 14, 30);
   doc.text(`Timestamp: ${new Date(prediction.created_at).toLocaleString()}`, 14, 38);
-  doc.text(
-    `Risk: ${Math.round(prediction.risk_percentage)}% (${prediction.risk_category})`,
-    14,
-    46
-  );
+  doc.text(`Risk: ${Math.round(prediction.risk_percentage)}% (${prediction.risk_category})`, 14, 46);
   doc.text(`Health score: ${prediction.health_score}/100`, 14, 54);
 
   const input = prediction.input ?? {};
@@ -159,15 +196,16 @@ function downloadPredictionPdfFromRow(opts: {
   lines.forEach((l, i) => doc.text(l, 14, 76 + i * 7));
 
   if (txId) {
-    doc.text("Verification", 14, 156);
-    doc.text(`Transaction ID: ${txId}`, 14, 164);
-    doc.text(`Verify URL: ${window.location.origin}/verify/${txId}`, 14, 172);
+    await addVerificationBlock(doc, { txId, createdAtIso: prediction.created_at });
+  } else {
+    const privacy =
+      "Privacy: This report may contain sensitive medical information. Share only with trusted healthcare providers.";
+    doc.setFontSize(9);
+    doc.text(doc.splitTextToSize(privacy, 180), 14, 286);
   }
 
   doc.save(
-    `smart-healthcare-report-${new Date(prediction.created_at)
-      .toISOString()
-      .slice(0, 10)}.pdf`
+    `smart-healthcare-report-${new Date(prediction.created_at).toISOString().slice(0, 10)}.pdf`,
   );
 }
 
@@ -354,9 +392,12 @@ export default function PatientPrediction() {
     }
 
     if (txId) {
-      doc.text("Verification", 14, 150);
-      doc.text(`Transaction ID: ${txId}`, 14, 158);
-      doc.text(`Verify URL: ${window.location.origin}/verify/${txId}`, 14, 166);
+      await addVerificationBlock(doc, { txId, createdAtIso: new Date().toISOString() });
+    } else {
+      const privacy =
+        "Privacy: This report may contain sensitive medical information. Share only with trusted healthcare providers.";
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(privacy, 180), 14, 286);
     }
 
     doc.save(`smart-healthcare-report-${Date.now()}.pdf`);
@@ -643,7 +684,7 @@ export default function PatientPrediction() {
                         className="rounded-xl"
                         onClick={() => {
                           if (!user?.email) return;
-                          downloadPredictionPdfFromRow({
+                          void downloadPredictionPdfFromRow({
                             email: user.email,
                             prediction: r,
                             txId: r.tx_id ?? null,
