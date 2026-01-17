@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
@@ -85,7 +85,11 @@ export default function PatientTelemedicine() {
     if (!date) return;
 
     // Basic check: doctor is available OR allow booking anyway (MVP)
-    const { data: avail } = await supabase.from("doctor_availability").select("doctor_id,is_available").eq("doctor_id", doctorId.trim()).maybeSingle();
+    const { data: avail } = await supabase
+      .from("doctor_availability")
+      .select("doctor_id,is_available")
+      .eq("doctor_id", doctorId.trim())
+      .maybeSingle();
     if ((avail as Availability | null)?.is_available === false) {
       toast({ title: "Doctor unavailable", description: "This doctor has availability toggled off.", variant: "destructive" });
       return;
@@ -139,6 +143,8 @@ export default function PatientTelemedicine() {
     if (error) toast({ title: "Message failed", description: error.message, variant: "destructive" });
   };
 
+  const today = startOfDay(new Date());
+
   return (
     <div className="grid gap-6">
       <section className="grid gap-4 md:grid-cols-3">
@@ -147,7 +153,13 @@ export default function PatientTelemedicine() {
             <CardTitle className="font-display">Book appointment</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-2xl border bg-background shadow-soft" />
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              disabled={(d) => d < today}
+              className="rounded-2xl border bg-background shadow-soft"
+            />
             <Input value={doctorId} onChange={(e) => setDoctorId(e.target.value)} placeholder="Doctor user id (UUID)" />
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)" />
             <Button variant="hero" className="rounded-xl" onClick={book}>
@@ -223,3 +235,4 @@ export default function PatientTelemedicine() {
     </div>
   );
 }
+
