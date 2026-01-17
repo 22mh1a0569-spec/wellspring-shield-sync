@@ -1,6 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Bell, ClipboardCheck, HeartPulse, LayoutDashboard, LogOut, Stethoscope, Video } from "lucide-react";
+import {
+  Bell,
+  ClipboardCheck,
+  HeartPulse,
+  LayoutDashboard,
+  LogOut,
+  ShieldCheck,
+  Stethoscope,
+  CalendarDays,
+  FileText,
+  BadgeCheck,
+  Video,
+} from "lucide-react";
 
 import { useAuth } from "@/providers/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +33,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { UserSidebarCard } from "@/components/UserSidebarCard";
 
 type NavItem = {
   to: string;
@@ -46,20 +59,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const nav = useMemo<NavItem[]>(() => {
     if (role === "doctor") {
       return [
-        { to: "/doctor", label: "Dashboard", icon: <LayoutDashboard /> },
-        { to: "/doctor/telemedicine", label: "Telemedicine", icon: <Video /> },
-        { to: "/doctor/predictions", label: "Predictions", icon: <ClipboardCheck /> },
+        { to: "/doctor", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+        { to: "/doctor/telemedicine", label: "Telemedicine", icon: <Video className="h-4 w-4" /> },
+        { to: "/doctor/predictions", label: "Predictions", icon: <ClipboardCheck className="h-4 w-4" /> },
       ];
     }
 
     return [
-      { to: "/patient", label: "Dashboard", icon: <LayoutDashboard /> },
-      { to: "/patient/predict", label: "AI Prediction", icon: <HeartPulse /> },
-      { to: "/patient/records", label: "Medical Records", icon: <ClipboardCheck /> },
-      { to: "/patient/verify", label: "Blockchain Verify", icon: <ClipboardCheck /> },
-      { to: "/patient/telemedicine", label: "Appointments", icon: <Video /> },
-      { to: "/patient/consents", label: "Access Control", icon: <ClipboardCheck /> },
-      { to: "/patient/telemedicine", label: "Telemedicine", icon: <Video /> },
+      { to: "/patient", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+      { to: "/patient/predict", label: "AI Prediction", icon: <HeartPulse className="h-4 w-4" /> },
+      { to: "/patient/records", label: "Medical Records", icon: <FileText className="h-4 w-4" /> },
+      { to: "/patient/verify", label: "Blockchain Verify", icon: <BadgeCheck className="h-4 w-4" /> },
+      { to: "/patient/telemedicine", label: "Appointments", icon: <CalendarDays className="h-4 w-4" /> },
+      { to: "/patient/consents", label: "Access Control", icon: <ShieldCheck className="h-4 w-4" /> },
     ];
   }, [role]);
 
@@ -91,16 +103,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-              <SidebarMenu>
+              <SidebarGroupLabel className="px-1 text-[11px] tracking-wide">Menu</SidebarGroupLabel>
+              <SidebarMenu className="gap-1.5">
                 {nav.map((item) => {
                   const active = location.pathname === item.to;
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                        <Link to={item.to}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={item.label}
+                        size="lg"
+                        className="rounded-xl"
+                      >
+                        <Link to={item.to} className="gap-3">
                           {item.icon}
-                          <span>{item.label}</span>
+                          <span className="text-sm">{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -112,6 +130,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <SidebarFooter>
             <div className="grid gap-2">
+              <UserSidebarCard name={null} email={user?.email ?? null} role={role ?? null} />
+
               <Button variant="outline" className="justify-between rounded-xl" asChild>
                 <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
                   <span className="inline-flex items-center gap-2">
@@ -120,6 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {unread ? <Badge variant="secondary">{unread}</Badge> : <span />}
                 </Link>
               </Button>
+
               <Button
                 variant="soft"
                 onClick={async () => {
