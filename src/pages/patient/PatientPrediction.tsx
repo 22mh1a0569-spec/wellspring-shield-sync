@@ -260,9 +260,10 @@ export default function PatientPrediction() {
               {txId ? (
                 <div className="mt-4 grid gap-3 md:grid-cols-[140px_1fr]">
                   <div className="rounded-lg border bg-card/70 p-3 shadow-soft">
-                    <QRCode
+                    <QRCodeSVG
                       value={`${window.location.origin}/verify/${txId}`}
-                      size={110}
+                      width={110}
+                      height={110}
                       bgColor="transparent"
                       fgColor="hsl(var(--foreground))"
                     />
