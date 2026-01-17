@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { QRCodeSVG } from "qrcode.react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { FileDown } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "@/hooks/use-toast";
@@ -100,6 +102,75 @@ async function sha256(text: string) {
     .join("");
 }
 
+type PredictionHistoryRow = {
+  id: string;
+  created_at: string;
+  risk_category: string;
+  risk_percentage: number;
+  health_score: number;
+  input: any;
+};
+
+type LedgerRow = {
+  prediction_id: string;
+  tx_id: string;
+};
+
+function safeDateMs(d: string) {
+  const ms = Date.parse(d);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function downloadPredictionPdfFromRow(opts: {
+  email: string;
+  prediction: PredictionHistoryRow;
+  txId?: string | null;
+}) {
+  const { email, prediction, txId } = opts;
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text("Smart Healthcare Report", 14, 18);
+
+  doc.setFontSize(11);
+  doc.text(`Patient: ${email}`, 14, 30);
+  doc.text(`Timestamp: ${new Date(prediction.created_at).toLocaleString()}`, 14, 38);
+  doc.text(
+    `Risk: ${Math.round(prediction.risk_percentage)}% (${prediction.risk_category})`,
+    14,
+    46
+  );
+  doc.text(`Health score: ${prediction.health_score}/100`, 14, 54);
+
+  const input = prediction.input ?? {};
+  doc.text("Inputs", 14, 68);
+  const lines = [
+    `Age: ${input.age_years ?? "—"} years`,
+    `Blood pressure: ${input.systolic_bp ?? "—"}/${input.diastolic_bp ?? "—"}`,
+    `Heart rate: ${input.heart_rate ?? "—"} bpm`,
+    `Glucose: ${input.glucose_mgdl ?? "—"} mg/dL`,
+    `Cholesterol: ${input.cholesterol_mgdl ?? "—"} mg/dL`,
+    `BMI: ${input.bmi ?? "—"}`,
+    `Temperature: ${input.temperature_c ?? "—"} °C`,
+    `Physical activity: ${input.physical_activity_level ?? "—"}`,
+    `Smoking: ${input.smoking ? "Yes" : "No"}`,
+    `Regular alcohol: ${input.regular_alcohol ? "Yes" : "No"}`,
+    `Family history: ${input.family_history ? "Yes" : "No"}`,
+  ];
+  lines.forEach((l, i) => doc.text(l, 14, 76 + i * 7));
+
+  if (txId) {
+    doc.text("Verification", 14, 156);
+    doc.text(`Transaction ID: ${txId}`, 14, 164);
+    doc.text(`Verify URL: ${window.location.origin}/verify/${txId}`, 14, 172);
+  }
+
+  doc.save(
+    `smart-healthcare-report-${new Date(prediction.created_at)
+      .toISOString()
+      .slice(0, 10)}.pdf`
+  );
+}
+
 export default function PatientPrediction() {
   const { user } = useAuth();
   const [remarks, setRemarks] = useState("");
@@ -128,6 +199,63 @@ export default function PatientPrediction() {
 
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [txId, setTxId] = useState<string | null>(null);
+
+  const [historyRows, setHistoryRows] = useState<(PredictionHistoryRow & { tx_id?: string | null })[]>([]);
+  const [filterRisk, setFilterRisk] = useState<"all" | "Low" | "Medium" | "High">("all");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+
+  const loadHistory = async () => {
+    if (!user?.id) return;
+
+    const predsRes = await supabase
+      .from("predictions")
+      .select("id,created_at,risk_category,risk_percentage,health_score,input")
+      .eq("patient_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    const preds = (predsRes.data ?? []) as PredictionHistoryRow[];
+    if (!preds.length) {
+      setHistoryRows([]);
+      return;
+    }
+
+    const predIds = preds.map((p) => p.id);
+    const ledgerRes = await supabase
+      .from("ledger_transactions")
+      .select("prediction_id,tx_id")
+      .in("prediction_id", predIds)
+      .order("created_at", { ascending: false });
+
+    const ledger = (ledgerRes.data ?? []) as LedgerRow[];
+    const txByPrediction = new Map<string, string>();
+    ledger.forEach((l) => {
+      if (!txByPrediction.has(l.prediction_id)) txByPrediction.set(l.prediction_id, l.tx_id);
+    });
+
+    setHistoryRows(preds.map((p) => ({ ...p, tx_id: txByPrediction.get(p.id) ?? null })));
+  };
+
+  useEffect(() => {
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, predictionId]);
+
+  const filteredHistory = useMemo(() => {
+    const fromMs = filterFrom ? safeDateMs(filterFrom + "T00:00:00") : null;
+    const toMs = filterTo ? safeDateMs(filterTo + "T23:59:59") : null;
+
+    return historyRows.filter((r) => {
+      if (filterRisk !== "all" && r.risk_category !== filterRisk) return false;
+
+      const createdMs = safeDateMs(r.created_at);
+      if (createdMs == null) return true;
+      if (fromMs != null && createdMs < fromMs) return false;
+      if (toMs != null && createdMs > toMs) return false;
+      return true;
+    });
+  }, [historyRows, filterFrom, filterTo, filterRisk]);
 
   const savePrediction = async () => {
     if (!user?.id) return;
@@ -454,6 +582,88 @@ export default function PatientPrediction() {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border bg-card shadow-card">
+        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="text-base font-semibold">Prediction History</CardTitle>
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="date"
+                value={filterFrom}
+                onChange={(e) => setFilterFrom(e.target.value)}
+                aria-label="From date"
+              />
+              <Input
+                type="date"
+                value={filterTo}
+                onChange={(e) => setFilterTo(e.target.value)}
+                aria-label="To date"
+              />
+            </div>
+
+            <Select value={filterRisk} onValueChange={(v) => setFilterRisk(v as any)}>
+              <SelectTrigger className="md:w-[170px]">
+                <SelectValue placeholder="Risk" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All risks</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+                <SelectItem value="Medium">Medium</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Risk</TableHead>
+                <TableHead>Health Score</TableHead>
+                <TableHead className="text-right">View PDF</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredHistory.length ? (
+                filteredHistory.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {r.risk_category.toUpperCase()} ({Math.round(r.risk_percentage)}%)
+                    </TableCell>
+                    <TableCell>{r.health_score}/100</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={() => {
+                          if (!user?.email) return;
+                          downloadPredictionPdfFromRow({
+                            email: user.email,
+                            prediction: r,
+                            txId: r.tx_id ?? null,
+                          });
+                        }}
+                      >
+                        <FileDown className="mr-2 h-4 w-4" /> View PDF
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                    No records match your filters.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>
