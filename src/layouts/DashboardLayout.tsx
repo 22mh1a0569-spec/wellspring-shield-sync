@@ -66,89 +66,92 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [role]);
 
   return (
-    <SidebarProvider defaultOpen>
-      <Sidebar variant="floating" collapsible="icon">
-        <SidebarHeader>
-          <div className="flex items-center gap-2 rounded-lg border bg-card/60 p-2 shadow-soft">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-accent-foreground">
-              {role === "doctor" ? <Stethoscope className="h-4 w-4" /> : <HeartPulse className="h-4 w-4" />}
-            </div>
-            <div className="min-w-0">
-              <div className="truncate font-display text-sm font-semibold">Smart Healthcare</div>
-              <div className="truncate text-xs text-muted-foreground">{title}</div>
-            </div>
-          </div>
-        </SidebarHeader>
-
-        <SidebarSeparator />
-
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-            <SidebarMenu>
-              {nav.map((item) => {
-                const active = location.pathname === item.to;
-                return (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                      <Link to={item.to}>
-                        {item.icon}
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
-        </SidebarContent>
-
-        <SidebarFooter>
-          <div className="grid gap-2">
-            <Button variant="outline" className="justify-between" asChild>
-              <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
-                <span className="inline-flex items-center gap-2">
-                  <Bell className="h-4 w-4" /> Notifications
-                </span>
-                {unread ? <Badge variant="secondary">{unread}</Badge> : <span />}
-              </Link>
-            </Button>
-            <Button
-              variant="soft"
-              onClick={async () => {
-                await signOut();
-              }}
-              className="justify-between"
-            >
-              <span className="inline-flex items-center gap-2">
-                <LogOut className="h-4 w-4" /> Sign out
-              </span>
-              <span className="text-xs text-muted-foreground">{user?.email}</span>
-            </Button>
-          </div>
-        </SidebarFooter>
-      </Sidebar>
-
-      <SidebarInset>
-        <header className="sticky top-0 z-20 border-b bg-background/70 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <div>
-                <div className="font-display text-sm font-semibold">{title}</div>
-                <div className="text-xs text-muted-foreground">Consent-first. Verifiable. Demo-ready.</div>
+      <SidebarProvider defaultOpen>
+        <Sidebar variant="floating" collapsible="icon" className="bg-transparent">
+          <SidebarHeader>
+            <div className="flex items-center gap-2 rounded-2xl border bg-card p-3 shadow-soft">
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-primary-foreground shadow-soft bg-[linear-gradient(135deg,hsl(var(--brand-teal)),hsl(var(--brand-teal-2)),hsl(var(--brand-orange)))]"
+                aria-hidden="true"
+              >
+                {role === "doctor" ? <Stethoscope className="h-4 w-4" /> : <HeartPulse className="h-4 w-4" />}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate font-display text-sm font-semibold">HealthChain</div>
+                <div className="truncate text-xs text-muted-foreground">{title}</div>
               </div>
             </div>
-            <div className="hidden items-center gap-2 md:flex">
-              <Badge variant="secondary">Role: {role ?? "…"}</Badge>
-            </div>
-          </div>
-        </header>
+          </SidebarHeader>
 
-        <div className="min-h-[calc(100svh-56px)] bg-hero">
-          <div className="mx-auto max-w-7xl px-4 py-6 animate-fade-in">{children}</div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+          <SidebarSeparator />
+
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+              <SidebarMenu>
+                {nav.map((item) => {
+                  const active = location.pathname === item.to;
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                        <Link to={item.to}>
+                          {item.icon}
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+
+          <SidebarFooter>
+            <div className="grid gap-2">
+              <Button variant="outline" className="justify-between rounded-xl" asChild>
+                <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
+                  <span className="inline-flex items-center gap-2">
+                    <Bell className="h-4 w-4" /> Notifications
+                  </span>
+                  {unread ? <Badge variant="secondary">{unread}</Badge> : <span />}
+                </Link>
+              </Button>
+              <Button
+                variant="soft"
+                onClick={async () => {
+                  await signOut();
+                }}
+                className="justify-between rounded-xl"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <LogOut className="h-4 w-4" /> Sign out
+                </span>
+                <span className="text-xs text-muted-foreground">{user?.email}</span>
+              </Button>
+            </div>
+          </SidebarFooter>
+        </Sidebar>
+
+        <SidebarInset className="bg-transparent">
+          <header className="sticky top-0 z-20 border-b bg-background/70 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <SidebarTrigger />
+                <div>
+                  <div className="font-display text-sm font-semibold">{title}</div>
+                  <div className="text-xs text-muted-foreground">Consent-first. Verifiable. Demo-ready.</div>
+                </div>
+              </div>
+              <div className="hidden items-center gap-2 md:flex">
+                <Badge variant="secondary">Role: {role ?? "…"}</Badge>
+              </div>
+            </div>
+          </header>
+
+          <div className="min-h-[calc(100svh-56px)] bg-hero">
+            <div className="mx-auto max-w-7xl px-4 py-6 animate-fade-in">{children}</div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
   );
 }

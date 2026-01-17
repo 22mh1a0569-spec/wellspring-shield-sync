@@ -55,10 +55,10 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <Card className="border bg-card/70 shadow-card backdrop-blur-sm transition-transform hover:-translate-y-0.5">
+    <Card className="border bg-card shadow-card transition-transform hover:-translate-y-0.5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="rounded-md bg-accent p-2 text-accent-foreground">{icon}</div>
+        <div className="rounded-2xl bg-accent p-2 text-accent-foreground">{icon}</div>
       </CardHeader>
       <CardContent>
         <div className="font-display text-2xl font-semibold tracking-tight">
@@ -144,7 +144,7 @@ export default function PatientDashboard() {
   return (
     <div className="grid gap-6">
       <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm md:col-span-2">
+        <Card className="border bg-card shadow-card md:col-span-2">
           <CardHeader>
             <CardTitle className="font-display">Overview</CardTitle>
           </CardHeader>
@@ -154,15 +154,15 @@ export default function PatientDashboard() {
               <StatCard title="Risk (computed)" value={`${riskInfo.risk}%`} icon={<Brain className="h-4 w-4" />} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button asChild variant="hero">
+              <Button asChild variant="hero" className="rounded-xl">
                 <Link to="/patient/predict">Run AI Prediction</Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="rounded-xl">
                 <Link to="/patient/telemedicine">
                   <CalendarPlus className="mr-2 h-4 w-4" /> Book Appointment
                 </Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="rounded-xl">
                 <Link to="/patient/consents">
                   <ShieldCheck className="mr-2 h-4 w-4" /> Manage Consent
                 </Link>
@@ -174,33 +174,33 @@ export default function PatientDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader>
             <CardTitle className="font-display">Latest Metrics</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border bg-background/60 p-3 shadow-soft">
+              <div className="rounded-2xl border bg-background p-4 shadow-soft">
                 <div className="text-xs text-muted-foreground">Heart rate</div>
                 <div className="mt-1 font-display text-lg font-semibold">{metric?.heart_rate ?? "—"}</div>
               </div>
-              <div className="rounded-lg border bg-background/60 p-3 shadow-soft">
+              <div className="rounded-2xl border bg-background p-4 shadow-soft">
                 <div className="text-xs text-muted-foreground">BP</div>
                 <div className="mt-1 font-display text-lg font-semibold">
                   {metric ? `${metric.systolic_bp}/${metric.diastolic_bp}` : "—"}
                 </div>
               </div>
-              <div className="rounded-lg border bg-background/60 p-3 shadow-soft">
+              <div className="rounded-2xl border bg-background p-4 shadow-soft">
                 <div className="text-xs text-muted-foreground">Glucose</div>
                 <div className="mt-1 font-display text-lg font-semibold">{metric?.glucose_mgdl ?? "—"}</div>
               </div>
-              <div className="rounded-lg border bg-background/60 p-3 shadow-soft">
+              <div className="rounded-2xl border bg-background p-4 shadow-soft">
                 <div className="text-xs text-muted-foreground">Temp</div>
                 <div className="mt-1 font-display text-lg font-semibold">{metric?.temperature_c ?? "—"}</div>
               </div>
             </div>
 
-            <Button variant="soft" onClick={seedIfEmpty} disabled={busySeed}>
+            <Button variant="soft" onClick={seedIfEmpty} disabled={busySeed} className="rounded-xl">
               {busySeed ? "Seeding…" : "Seed demo data"}
             </Button>
           </CardContent>
@@ -208,7 +208,7 @@ export default function PatientDashboard() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm md:col-span-2">
+        <Card className="border bg-card shadow-card md:col-span-2">
           <CardHeader>
             <CardTitle className="font-display">Prediction Trends</CardTitle>
           </CardHeader>
@@ -232,12 +232,12 @@ export default function PatientDashboard() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="rounded-lg border bg-background/60 p-6 shadow-soft">
+              <div className="rounded-2xl border bg-background p-6 shadow-soft">
                 <div className="flex items-center gap-2 font-medium">
                   <FileCheck2 className="h-4 w-4" /> No predictions yet
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">Run your first AI prediction to see trends over time.</p>
-                <Button asChild className="mt-4" variant="hero">
+                <Button asChild className="mt-4 rounded-xl" variant="hero">
                   <Link to="/patient/predict">Start prediction</Link>
                 </Button>
               </div>
@@ -245,7 +245,7 @@ export default function PatientDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader>
             <CardTitle className="font-display">Reports</CardTitle>
           </CardHeader>
@@ -253,7 +253,7 @@ export default function PatientDashboard() {
             <p className="text-sm text-muted-foreground">
               Each prediction can be exported as a PDF report and anchored into a ledger-style transaction for verification.
             </p>
-            <Button asChild variant="outline" className="mt-4 w-full">
+            <Button asChild variant="outline" className="mt-4 w-full rounded-xl">
               <Link to="/patient/predict">Generate new report</Link>
             </Button>
           </CardContent>

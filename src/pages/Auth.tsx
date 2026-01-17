@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { Stethoscope, User } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,34 +10,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
+import { HealthChainBrand } from "@/components/HealthChainBrand";
 
 const emailSchema = z.string().email("Enter a valid email");
 const passwordSchema = z.string().min(8, "Minimum 8 characters");
 
 type Role = "patient" | "doctor";
 
-function RoleToggle({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
+function RoleCard({
+  active,
+  title,
+  icon,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-lg border bg-background/60 p-1">
-      <button
-        type="button"
-        onClick={() => onChange("patient")}
-        className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-          value === "patient" ? "bg-accent text-accent-foreground shadow-soft" : "hover:bg-accent/60"
-        }`}
-      >
-        Patient
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("doctor")}
-        className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-          value === "doctor" ? "bg-accent text-accent-foreground shadow-soft" : "hover:bg-accent/60"
-        }`}
-      >
-        Doctor
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border bg-card p-5 text-center shadow-soft transition " +
+        (active ? "ring-2 ring-ring bg-accent" : "hover:bg-accent/60")
+      }
+    >
+      <div className={"grid h-10 w-10 place-items-center rounded-full " + (active ? "bg-background" : "bg-secondary")}>{icon}</div>
+      <div className="text-sm font-semibold">{title}</div>
+    </button>
   );
 }
 
@@ -52,9 +56,7 @@ export default function AuthPage() {
 
   const subtitle = useMemo(
     () =>
-      tab === "login"
-        ? "Secure sign-in for patients and clinicians."
-        : "Create your account and choose your role — permissions are enforced server-side.",
+      tab === "login" ? "Sign in to access your health dashboard" : "Join HealthChain for secure healthcare",
     [tab],
   );
 
@@ -74,7 +76,7 @@ export default function AuthPage() {
       if (error) throw error;
       if (data.user?.id) await afterAuthRedirect(data.user.id);
     } catch (e: any) {
-      toast({ title: "Login failed", description: e?.message ?? "Please try again.", variant: "destructive" });
+      toast({ title: "Sign in failed", description: e?.message ?? "Please try again.", variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -100,14 +102,12 @@ export default function AuthPage() {
         return;
       }
 
-      // Create profile (non-sensitive metadata)
       await supabase.from("profiles").upsert({
         user_id: userId,
         full_name: fullName || null,
         specialization: role === "doctor" ? specialization || null : null,
       });
 
-      // Create role record (security requirement)
       const { error: roleErr } = await supabase.from("user_roles").insert({ user_id: userId, role });
       if (roleErr) throw roleErr;
 
@@ -115,14 +115,10 @@ export default function AuthPage() {
         await supabase.from("doctor_availability").upsert({ doctor_id: userId, is_available: true });
       }
 
-      toast({
-        title: "Account created",
-        description: "You’re in — welcome to Smart Healthcare.",
-      });
-
+      toast({ title: "Account created", description: "Welcome to HealthChain." });
       await afterAuthRedirect(userId);
     } catch (e: any) {
-      toast({ title: "Signup failed", description: e?.message ?? "Please try again.", variant: "destructive" });
+      toast({ title: "Sign up failed", description: e?.message ?? "Please try again.", variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -130,113 +126,152 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-hero">
-      <div className="mx-auto flex min-h-screen max-w-5xl items-center px-6 py-10">
-        <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="relative overflow-hidden rounded-2xl border bg-card/70 p-8 shadow-card backdrop-blur-sm animate-fade-in">
-            <div className="absolute inset-0 opacity-60 motion-safe:animate-glow-drift">
-              <div className="h-full w-full bg-hero" />
-            </div>
-            <div className="relative">
-              <h1 className="font-display text-3xl font-semibold tracking-tight">Smart Healthcare</h1>
-              <p className="mt-2 text-muted-foreground">
-                AI risk prediction, consent-based sharing, telemedicine, and blockchain-style verification — built as a clean MVP.
-              </p>
-              <div className="mt-8 grid gap-3">
-                {[
-                  "AI prediction with history + trends",
-                  "Consent-based doctor access (server enforced)",
-                  "Telemedicine appointments + chat",
-                  "Ledger-style record verification + QR",
-                ].map((t) => (
-                  <div key={t} className="rounded-lg border bg-background/50 px-4 py-3 shadow-soft">
-                    <div className="text-sm">{t}</div>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-6 text-xs text-muted-foreground">
-                Tip: For testing, email confirmation is already disabled in the backend settings.
-              </p>
-            </div>
-          </div>
+      <main className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 items-center gap-10 px-6 py-10 md:grid-cols-2">
+        {/* Left marketing panel */}
+        <section className="animate-fade-in">
+          <HealthChainBrand />
 
-          <Card className="border bg-card/70 shadow-card backdrop-blur-sm animate-fade-in">
-            <CardHeader>
-              <CardTitle className="font-display">{tab === "login" ? "Sign in" : "Create account"}</CardTitle>
-              <CardDescription>{subtitle}</CardDescription>
+          <h1 className="mt-10 font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-foreground">
+            Secure Health Records
+            <br />
+            with <span className="text-primary">Blockchain</span> &amp; AI
+          </h1>
+
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
+            Experience the future of healthcare with AI-powered disease prediction and tamper-proof medical records secured by
+            blockchain technology.
+          </p>
+
+          <div className="mt-10 grid max-w-xl gap-4">
+            {["AI Disease Risk Prediction", "Blockchain Record Verification", "Consent-Based Access Control"].map((t) => (
+              <div key={t} className="flex items-center gap-4 rounded-2xl border bg-card px-5 py-5 shadow-soft">
+                <div className="h-12 w-12 rounded-2xl bg-accent shadow-soft" aria-hidden="true" />
+                <div className="text-base font-semibold">{t}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Right auth card */}
+        <section className="animate-fade-in">
+          <Card className="mx-auto w-full max-w-lg border bg-card shadow-card">
+            <CardHeader className="text-center">
+              <CardTitle className="font-display text-3xl font-extrabold tracking-tight">
+                {tab === "login" ? "Welcome Back" : "Create Account"}
+              </CardTitle>
+              <CardDescription className="text-base">{subtitle}</CardDescription>
             </CardHeader>
+
             <CardContent>
               <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="signup">Sign up</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 rounded-xl bg-secondary">
+                  <TabsTrigger value="login" className="rounded-lg">
+                    Sign In
+                  </TabsTrigger>
+                  <TabsTrigger value="signup" className="rounded-lg">
+                    Sign Up
+                  </TabsTrigger>
                 </TabsList>
 
-                <div className="mt-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@domain.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Minimum 8 characters"
-                    />
-                  </div>
-
-                  <TabsContent value="signup" className="m-0 space-y-4">
+                <div className="mt-6 space-y-5">
+                  <TabsContent value="signup" className="m-0 space-y-5">
                     <div className="space-y-2">
-                      <Label>Role</Label>
-                      <RoleToggle value={role} onChange={setRole} />
+                      <div className="text-sm font-semibold">I am a</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <RoleCard
+                          title="Patient"
+                          icon={<User className="h-5 w-5 text-primary" />}
+                          active={role === "patient"}
+                          onClick={() => setRole("patient")}
+                        />
+                        <RoleCard
+                          title="Doctor"
+                          icon={<Stethoscope className="h-5 w-5 text-primary" />}
+                          active={role === "doctor"}
+                          onClick={() => setRole("doctor")}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="fullName">Full name</Label>
-                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Optional" />
+                      <Label htmlFor="fullName">Full Name</Label>
+                      <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Dr. John Smith" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                      />
+                      <div className="text-xs text-muted-foreground">Minimum 8 characters</div>
                     </div>
 
                     {role === "doctor" ? (
                       <div className="space-y-2">
                         <Label htmlFor="spec">Specialization</Label>
-                        <Input
-                          id="spec"
-                          value={specialization}
-                          onChange={(e) => setSpecialization(e.target.value)}
-                          placeholder="e.g., Cardiology"
-                        />
+                        <Input id="spec" value={specialization} onChange={(e) => setSpecialization(e.target.value)} placeholder="e.g., Cardiology" />
                       </div>
                     ) : null}
 
-                    <Button variant="hero" className="w-full" disabled={busy} onClick={onSignup}>
-                      {busy ? "Creating…" : "Create account"}
+                    <Button variant="hero" className="h-12 w-full rounded-xl" disabled={busy} onClick={onSignup}>
+                      {busy ? "Creating…" : "Create Account"}
                     </Button>
                   </TabsContent>
 
-                  <TabsContent value="login" className="m-0 space-y-4">
-                    <Button variant="hero" className="w-full" disabled={busy} onClick={onLogin}>
-                      {busy ? "Signing in…" : "Sign in"}
-                    </Button>
+                  <TabsContent value="login" className="m-0 space-y-5">
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">I am a</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <RoleCard
+                          title="Patient"
+                          icon={<User className="h-5 w-5 text-primary" />}
+                          active={role === "patient"}
+                          onClick={() => setRole("patient")}
+                        />
+                        <RoleCard
+                          title="Doctor"
+                          icon={<Stethoscope className="h-5 w-5 text-primary" />}
+                          active={role === "doctor"}
+                          onClick={() => setRole("doctor")}
+                        />
+                      </div>
+                    </div>
 
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      disabled={busy}
-                      onClick={() => {
-                        setTab("signup");
-                      }}
-                    >
-                      New here? Create an account
+                    <div className="space-y-2">
+                      <Label htmlFor="email2">Email</Label>
+                      <Input id="email2" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password2">Password</Label>
+                      <Input
+                        id="password2"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                      />
+                    </div>
+
+                    <Button variant="hero" className="h-12 w-full rounded-xl" disabled={busy} onClick={onLogin}>
+                      {busy ? "Signing in…" : "Sign In"}
                     </Button>
                   </TabsContent>
                 </div>
               </Tabs>
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

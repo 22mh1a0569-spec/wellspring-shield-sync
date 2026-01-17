@@ -72,10 +72,10 @@ export default function DoctorDashboard() {
   return (
     <div className="grid gap-6">
       <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="font-display text-base">Granted Patients</CardTitle>
-            <div className="rounded-md bg-accent p-2 text-accent-foreground">
+            <div className="rounded-2xl bg-accent p-2 text-accent-foreground">
               <Users className="h-4 w-4" />
             </div>
           </CardHeader>
@@ -85,33 +85,33 @@ export default function DoctorDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="font-display text-base">Pending Requests</CardTitle>
-            <div className="rounded-md bg-accent p-2 text-accent-foreground">
+            <div className="rounded-2xl bg-accent p-2 text-accent-foreground">
               <ShieldAlert className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="font-display text-3xl font-semibold">{pending}</div>
             <p className="text-sm text-muted-foreground">Awaiting approval.</p>
-            <Button asChild variant="outline" className="mt-3 w-full">
+            <Button asChild variant="outline" className="mt-3 w-full rounded-xl">
               <Link to="/doctor/consent-requests">Review requests</Link>
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="font-display text-base">Upcoming Appointments</CardTitle>
-            <div className="rounded-md bg-accent p-2 text-accent-foreground">
+            <div className="rounded-2xl bg-accent p-2 text-accent-foreground">
               <CalendarDays className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="font-display text-3xl font-semibold">{upcoming}</div>
             <p className="text-sm text-muted-foreground">Scheduled consultations.</p>
-            <Button asChild variant="outline" className="mt-3 w-full">
+            <Button asChild variant="outline" className="mt-3 w-full rounded-xl">
               <Link to="/doctor/telemedicine">Open telemedicine</Link>
             </Button>
           </CardContent>
@@ -119,7 +119,7 @@ export default function DoctorDashboard() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm md:col-span-2">
+        <Card className="border bg-card shadow-card md:col-span-2">
           <CardHeader>
             <CardTitle className="font-display">Patient List</CardTitle>
           </CardHeader>
@@ -129,12 +129,12 @@ export default function DoctorDashboard() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" placeholder="Search by name or ID" />
               </div>
-              <Button variant="hero" asChild>
+              <Button variant="hero" asChild className="rounded-xl">
                 <Link to="/doctor/telemedicine">Schedule</Link>
               </Button>
             </div>
 
-            <div className="rounded-xl border bg-background/60 shadow-soft">
+            <div className="rounded-2xl border bg-background shadow-soft">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -150,7 +150,7 @@ export default function DoctorDashboard() {
                         <TableCell className="font-medium">{p.full_name ?? "Patient"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.patient_id.slice(0, 8)}…</TableCell>
                         <TableCell className="text-right">
-                          <Button asChild variant="outline" size="sm">
+                          <Button asChild variant="outline" size="sm" className="rounded-xl">
                             <Link to={`/doctor/patient/${p.patient_id}`}>View</Link>
                           </Button>
                         </TableCell>
@@ -169,20 +169,20 @@ export default function DoctorDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader>
             <CardTitle className="font-display">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2">
-            <Button asChild variant="hero">
+            <Button asChild variant="hero" className="rounded-xl">
               <Link to="/doctor/predictions">
                 <ClipboardCheck className="mr-2 h-4 w-4" /> Recent predictions
               </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="rounded-xl">
               <Link to="/doctor/consent-requests">Access approvals</Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="rounded-xl">
               <Link to="/doctor/telemedicine">Appointments</Link>
             </Button>
           </CardContent>
