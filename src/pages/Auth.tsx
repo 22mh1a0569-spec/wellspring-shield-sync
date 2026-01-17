@@ -57,7 +57,7 @@ function RoleCard({
       type="button"
       onClick={onClick}
       className={
-        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border bg-card p-5 text-center shadow-soft transition " +
+        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border bg-card p-5 text-center shadow-soft transition hover-scale " +
         (active ? "ring-2 ring-ring bg-accent" : "hover:bg-accent/60")
       }
     >
@@ -227,7 +227,7 @@ export default function AuthPage() {
                 </TabsList>
 
                 <div className="mt-6 space-y-5">
-                  <TabsContent value="signup" className="m-0 space-y-5">
+                  <TabsContent value="signup" className="m-0 space-y-5 animate-enter">
                     <div className="space-y-2">
                       <div className="text-sm font-semibold">I am a</div>
                       <div className="grid grid-cols-2 gap-4">
@@ -282,7 +282,7 @@ export default function AuthPage() {
                     <InlineNotice notice={notice} />
                   </TabsContent>
 
-                  <TabsContent value="login" className="m-0 space-y-5">
+                  <TabsContent value="login" className="m-0 space-y-5 animate-enter">
                     <div className="space-y-2">
                       <div className="text-sm font-semibold">I am a</div>
                       <div className="grid grid-cols-2 gap-4">

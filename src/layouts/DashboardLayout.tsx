@@ -129,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         isActive={active}
                         tooltip={item.label}
                         size="lg"
-                        className="rounded-xl"
+                        className="rounded-xl hover-scale"
                       >
                         <Link to={item.to} className="gap-3">
                           {item.icon}
