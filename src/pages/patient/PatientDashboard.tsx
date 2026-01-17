@@ -124,7 +124,7 @@ function StatTile({
           : "bg-[hsl(var(--brand-teal-2)/0.12)] text-foreground";
 
   return (
-    <Card className={`rounded-2xl border shadow-soft ${tintClass}`}>
+    <Card className={`rounded-2xl border shadow-soft ${tintClass} transition hover-scale`}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -317,7 +317,7 @@ export default function PatientDashboard() {
   return (
     <div className="grid gap-6">
       {/* Header */}
-      <section className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <section className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center animate-enter">
         <div>
           <h1 className="font-display text-4xl font-extrabold tracking-tight">Welcome back, {fullName}! 👋</h1>
           <p className="mt-1 text-sm text-muted-foreground">Here's an overview of your health metrics</p>
@@ -333,7 +333,7 @@ export default function PatientDashboard() {
       </section>
 
       {/* Stat tiles */}
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-4 animate-enter">
         <StatTile
           title="Heart Rate"
           value={`${latest?.heart_rate ?? 72} bpm`}
@@ -367,8 +367,8 @@ export default function PatientDashboard() {
       </section>
 
       {/* Score + Trends */}
-      <section className="grid gap-4 lg:grid-cols-3">
-        <Card className="rounded-2xl border bg-card shadow-card">
+      <section className="grid gap-4 lg:grid-cols-3 animate-enter">
+        <Card className="rounded-2xl border bg-card shadow-card transition hover-scale">
           <CardHeader className="pb-0">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Sparkles className="h-4 w-4 text-primary" /> Overall Health Score
@@ -403,7 +403,7 @@ export default function PatientDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border bg-card shadow-card lg:col-span-2">
+        <Card className="rounded-2xl border bg-card shadow-card lg:col-span-2 transition hover-scale">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <LineChartIcon className="h-4 w-4 text-primary" /> Health Trends
@@ -452,8 +452,8 @@ export default function PatientDashboard() {
       </section>
 
       {/* BMI + Tip + Quick actions */}
-      <section className="grid gap-4 lg:grid-cols-3">
-        <Card className="rounded-2xl border bg-card shadow-card">
+      <section className="grid gap-4 lg:grid-cols-3 animate-enter">
+        <Card className="rounded-2xl border bg-card shadow-card transition hover-scale">
           <CardHeader>
             <CardTitle className="text-base font-semibold">BMI Calculator</CardTitle>
           </CardHeader>
@@ -482,7 +482,7 @@ export default function PatientDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border bg-card shadow-card">
+        <Card className="rounded-2xl border bg-card shadow-card transition hover-scale">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Daily Health Tip</CardTitle>
           </CardHeader>
@@ -505,7 +505,7 @@ export default function PatientDashboard() {
                   <button
                     key={idx}
                     type="button"
-                    className="grid h-11 place-items-center rounded-xl border bg-background shadow-soft hover:bg-accent/60"
+                    className="grid h-11 place-items-center rounded-xl border bg-background shadow-soft hover:bg-accent/60 hover-scale"
                     aria-label="Tip category"
                   >
                     {ic}
@@ -516,7 +516,7 @@ export default function PatientDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border bg-card shadow-card">
+        <Card className="rounded-2xl border bg-card shadow-card transition hover-scale">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
           </CardHeader>
@@ -546,8 +546,8 @@ export default function PatientDashboard() {
       </section>
 
       {/* Prediction history */}
-      <section>
-        <Card className="rounded-2xl border bg-card shadow-card">
+      <section className="animate-enter">
+        <Card className="rounded-2xl border bg-card shadow-card transition hover-scale">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base font-semibold">Prediction History</CardTitle>
             <Button asChild variant="outline" size="sm" className="rounded-xl">
