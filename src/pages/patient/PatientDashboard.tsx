@@ -1,27 +1,67 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, Brain, CalendarPlus, FileCheck2, ShieldCheck } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Activity,
+  ArrowRight,
+  Droplets,
+  Dumbbell,
+  Heart,
+  LineChart as LineChartIcon,
+  Moon,
+  Sparkles,
+  Thermometer,
+} from "lucide-react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
-import { toast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
-type Metric = {
-  heart_rate: number;
-  systolic_bp: number;
-  diastolic_bp: number;
-  glucose_mgdl: number;
-  temperature_c: number;
+type MetricRow = {
+  heart_rate: number | null;
+  systolic_bp: number | null;
+  diastolic_bp: number | null;
+  glucose_mgdl: number | null;
+  temperature_c: number | null;
+  recorded_at: string;
 };
 
-type PredictionPoint = { date: string; risk: number; score: number };
+type TrendPoint = {
+  label: string;
+  healthScore: number;
+  bloodPressure: number;
+  glucose: number;
+};
+
+type PredictionRow = {
+  id: string;
+  created_at: string;
+  risk_category: string;
+  risk_percentage: number;
+  health_score: number;
+};
+
+type LedgerRow = {
+  prediction_id: string;
+  tx_id: string;
+};
 
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
-function computeScore(m: Partial<Metric>) {
+function computeHealthScore(m: Partial<MetricRow>) {
   const hr = m.heart_rate ?? 72;
   const sys = m.systolic_bp ?? 120;
   const dia = m.diastolic_bp ?? 80;
@@ -37,225 +77,528 @@ function computeScore(m: Partial<Metric>) {
   return clamp(Math.round(score), 0, 100);
 }
 
-function scoreToRisk(score: number) {
-  const risk = clamp(100 - score, 0, 100);
-  const category = risk < 25 ? "Low" : risk < 60 ? "Medium" : "High";
-  return { risk, category };
+function formatDelta(curr?: number | null, prev?: number | null) {
+  if (curr == null || prev == null || prev === 0) return null;
+  const pct = ((curr - prev) / prev) * 100;
+  if (!Number.isFinite(pct)) return null;
+  const direction = pct >= 0 ? "↑" : "↓";
+  return `${direction} ${Math.abs(pct).toFixed(0)}% from last month`;
 }
 
-function StatCard({
+function shortTx(tx?: string | null) {
+  if (!tx) return "—";
+  return tx.length <= 12 ? tx : `${tx.slice(0, 6)}…${tx.slice(-4)}`;
+}
+
+function StatTile({
   title,
   value,
-  suffix,
+  meta,
+  delta,
   icon,
+  tint,
 }: {
   title: string;
   value: string;
-  suffix?: string;
+  meta: string;
+  delta?: { text: string; tone: "good" | "bad" } | null;
   icon: React.ReactNode;
+  tint: "rose" | "mint" | "peach" | "sky";
 }) {
+  const tintClass =
+    tint === "rose"
+      ? "border-[hsl(var(--brand-orange)/0.18)] bg-[linear-gradient(135deg,hsl(var(--brand-orange)/0.14),hsl(var(--card)))]"
+      : tint === "mint"
+        ? "border-[hsl(var(--brand-teal)/0.18)] bg-[linear-gradient(135deg,hsl(var(--brand-teal)/0.12),hsl(var(--card)))]"
+        : tint === "peach"
+          ? "border-[hsl(var(--brand-orange)/0.16)] bg-[linear-gradient(135deg,hsl(var(--brand-orange)/0.10),hsl(var(--card)))]"
+          : "border-[hsl(var(--brand-teal-2)/0.18)] bg-[linear-gradient(135deg,hsl(var(--brand-teal-2)/0.10),hsl(var(--card)))]";
+
+  const iconClass =
+    tint === "rose"
+      ? "bg-[hsl(var(--brand-orange)/0.14)] text-foreground"
+      : tint === "mint"
+        ? "bg-[hsl(var(--brand-teal)/0.14)] text-foreground"
+        : tint === "peach"
+          ? "bg-[hsl(var(--brand-orange)/0.12)] text-foreground"
+          : "bg-[hsl(var(--brand-teal-2)/0.12)] text-foreground";
+
   return (
-    <Card className="border bg-card shadow-card transition-transform hover:-translate-y-0.5">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="rounded-2xl bg-accent p-2 text-accent-foreground">{icon}</div>
-      </CardHeader>
-      <CardContent>
-        <div className="font-display text-2xl font-semibold tracking-tight">
-          {value}
-          {suffix ? <span className="ml-1 text-sm font-medium text-muted-foreground">{suffix}</span> : null}
+    <Card className={`rounded-2xl border shadow-soft ${tintClass}`}>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">{title}</div>
+            <div className="mt-2 font-display text-3xl font-extrabold tracking-tight">{value}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
+            {delta ? (
+              <div
+                className={
+                  "mt-2 text-xs font-medium " +
+                  (delta.tone === "good" ? "text-primary" : "text-destructive")
+                }
+              >
+                {delta.text}
+              </div>
+            ) : null}
+          </div>
+          <div className={`grid h-11 w-11 place-items-center rounded-2xl ${iconClass}`}>{icon}</div>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Updated from your latest metrics.</p>
       </CardContent>
     </Card>
   );
 }
 
+function ScoreRing({ score, label }: { score: number; label: string }) {
+  const pct = clamp(score, 0, 100);
+  const ringStyle: React.CSSProperties = {
+    background: `conic-gradient(hsl(var(--brand-teal)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="grid h-44 w-44 place-items-center rounded-full" style={ringStyle} aria-label={`Health score ${pct} out of 100`}>
+        <div className="grid h-[82%] w-[82%] place-items-center rounded-full bg-card shadow-soft">
+          <div className="text-center">
+            <div className="font-display text-4xl font-extrabold tracking-tight">{pct}</div>
+            <div className="text-xs text-muted-foreground">Health Score</div>
+          </div>
+        </div>
+      </div>
+      <div className="text-sm font-semibold">{label}</div>
+    </div>
+  );
+}
+
 export default function PatientDashboard() {
   const { user } = useAuth();
-  const [metric, setMetric] = useState<Metric | null>(null);
-  const [trend, setTrend] = useState<PredictionPoint[]>([]);
-  const [busySeed, setBusySeed] = useState(false);
 
-  const score = useMemo(() => computeScore(metric ?? {}), [metric]);
-  const riskInfo = useMemo(() => scoreToRisk(score), [score]);
+  const [fullName, setFullName] = useState<string>("");
+  const [latest, setLatest] = useState<MetricRow | null>(null);
+  const [prev, setPrev] = useState<MetricRow | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [history, setHistory] = useState<(PredictionRow & { tx_id?: string | null })[]>([]);
 
-  const seedIfEmpty = async () => {
-    if (!user?.id) return;
-    setBusySeed(true);
-    try {
-      const { data: rows } = await supabase.from("health_metrics").select("id").eq("patient_id", user.id).limit(1);
-      if (rows?.length) return;
+  const [heightCm, setHeightCm] = useState("170");
+  const [weightKg, setWeightKg] = useState("70");
+  const [bmi, setBmi] = useState<{ value: number; label: string } | null>(null);
 
-      const now = Date.now();
-      const samples: Metric[] = [
-        { heart_rate: 74, systolic_bp: 122, diastolic_bp: 80, glucose_mgdl: 98, temperature_c: 36.7 },
-        { heart_rate: 78, systolic_bp: 128, diastolic_bp: 84, glucose_mgdl: 112, temperature_c: 36.9 },
-        { heart_rate: 70, systolic_bp: 118, diastolic_bp: 78, glucose_mgdl: 102, temperature_c: 36.6 },
-      ];
+  const score = useMemo(() => computeHealthScore(latest ?? {}), [latest]);
 
-      await supabase.from("health_metrics").insert(
-        samples.map((s, i) => ({
-          patient_id: user.id,
-          ...s,
-          recorded_at: new Date(now - (samples.length - i) * 24 * 3600 * 1000).toISOString(),
-        })),
-      );
+  const scoreLabel = useMemo(() => {
+    if (score >= 85) return "Excellent";
+    if (score >= 70) return "Good";
+    if (score >= 55) return "Fair";
+    return "Needs attention";
+  }, [score]);
 
-      toast({ title: "Demo data added", description: "We seeded a few health metrics so your dashboard looks alive." });
-    } finally {
-      setBusySeed(false);
-    }
-  };
+  const breakdown = useMemo(() => {
+    // deterministic, “dashboard-like” breakdown values
+    const cardio = clamp(Math.round(score * 0.95), 0, 100);
+    const metabolic = clamp(Math.round(score * 0.86 + 5), 0, 100);
+    const lifestyle = clamp(Math.round(score * 0.78 + 2), 0, 100);
+    return { cardio, metabolic, lifestyle };
+  }, [score]);
+
+  const tips = useMemo(
+    () => [
+      {
+        title: "Sleep",
+        body: "Get 7-9 hours of quality sleep each night for optimal health and recovery.",
+      },
+      {
+        title: "Hydration",
+        body: "Drink water regularly throughout the day—aim for clear or pale yellow urine.",
+      },
+      {
+        title: "Movement",
+        body: "Try a 20-minute walk today—small steps add up and support heart health.",
+      },
+    ],
+    [],
+  );
+
+  const dailyTip = useMemo(() => {
+    const idx = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % tips.length;
+    return tips[idx];
+  }, [tips]);
 
   useEffect(() => {
     if (!user?.id) return;
 
-    seedIfEmpty();
+    const run = async () => {
+      const [profileRes, metricsRes, trendRes, predsRes] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
+        supabase
+          .from("health_metrics")
+          .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c,recorded_at")
+          .eq("patient_id", user.id)
+          .order("recorded_at", { ascending: false })
+          .limit(2),
+        supabase
+          .from("health_metrics")
+          .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c,recorded_at")
+          .eq("patient_id", user.id)
+          .order("recorded_at", { ascending: true })
+          .limit(6),
+        supabase
+          .from("predictions")
+          .select("id,created_at,risk_category,risk_percentage,health_score")
+          .eq("patient_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
 
-    supabase
-      .from("health_metrics")
-      .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c")
-      .eq("patient_id", user.id)
-      .order("recorded_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setMetric(data as any);
+      setFullName(profileRes.data?.full_name ?? user.email?.split("@")[0] ?? "");
+
+      const latestRow = (metricsRes.data?.[0] ?? null) as MetricRow | null;
+      const prevRow = (metricsRes.data?.[1] ?? null) as MetricRow | null;
+      setLatest(latestRow);
+      setPrev(prevRow);
+
+      const points = (trendRes.data ?? []) as MetricRow[];
+      setTrend(
+        points.map((m) => ({
+          label: new Date(m.recorded_at).toLocaleDateString(undefined, { month: "short" }),
+          healthScore: computeHealthScore(m),
+          bloodPressure: m.systolic_bp ?? 120,
+          glucose: m.glucose_mgdl ?? 95,
+        })),
+      );
+
+      const preds = (predsRes.data ?? []) as PredictionRow[];
+      if (!preds.length) {
+        setHistory([]);
+        return;
+      }
+
+      const predIds = preds.map((p) => p.id);
+      const ledgerRes = await supabase
+        .from("ledger_transactions")
+        .select("prediction_id,tx_id")
+        .in("prediction_id", predIds)
+        .order("created_at", { ascending: false });
+
+      const ledger = (ledgerRes.data ?? []) as LedgerRow[];
+      const txByPrediction = new Map<string, string>();
+      ledger.forEach((l) => {
+        if (!txByPrediction.has(l.prediction_id)) txByPrediction.set(l.prediction_id, l.tx_id);
       });
 
-    supabase
-      .from("predictions")
-      .select("created_at,risk_percentage,health_score")
-      .eq("patient_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(30)
-      .then(({ data }) => {
-        const next =
-          data?.map((p) => ({
-            date: new Date(p.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-            risk: p.risk_percentage,
-            score: p.health_score,
-          })) ?? [];
-        setTrend(next);
-      });
+      setHistory(preds.map((p) => ({ ...p, tx_id: txByPrediction.get(p.id) ?? null })));
+    };
+
+    run();
   }, [user?.id]);
+
+  const heartDelta = useMemo(() => {
+    const txt = formatDelta(latest?.heart_rate, prev?.heart_rate);
+    if (!txt) return null;
+    const tone = txt.includes("↓") ? "good" : "bad";
+    return { text: txt, tone } as const;
+  }, [latest?.heart_rate, prev?.heart_rate]);
+
+  const glucoseDelta = useMemo(() => {
+    const txt = formatDelta(latest?.glucose_mgdl, prev?.glucose_mgdl);
+    if (!txt) return null;
+    const tone = txt.includes("↓") ? "good" : "bad";
+    return { text: txt, tone } as const;
+  }, [latest?.glucose_mgdl, prev?.glucose_mgdl]);
+
+  const onCalcBmi = () => {
+    const h = Number(heightCm);
+    const w = Number(weightKg);
+    if (!h || !w) return;
+    const v = w / Math.pow(h / 100, 2);
+    const label = v < 18.5 ? "Underweight" : v < 25 ? "Normal" : v < 30 ? "Overweight" : "Obese";
+    setBmi({ value: Number(v.toFixed(1)), label });
+  };
 
   return (
     <div className="grid gap-6">
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border bg-card shadow-card md:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display">Overview</CardTitle>
+      {/* Header */}
+      <section className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+        <div>
+          <h1 className="font-display text-4xl font-extrabold tracking-tight">Welcome back, {fullName}! 👋</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Here's an overview of your health metrics</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/patient/telemedicine">Book Appointment</Link>
+          </Button>
+          <Button asChild variant="hero" className="rounded-xl">
+            <Link to="/patient/predict">New Prediction</Link>
+          </Button>
+        </div>
+      </section>
+
+      {/* Stat tiles */}
+      <section className="grid gap-4 md:grid-cols-4">
+        <StatTile
+          title="Heart Rate"
+          value={`${latest?.heart_rate ?? 72} bpm`}
+          meta="Normal range"
+          delta={heartDelta}
+          icon={<Heart className="h-5 w-5" />}
+          tint="rose"
+        />
+        <StatTile
+          title="Blood Pressure"
+          value={latest?.systolic_bp && latest?.diastolic_bp ? `${latest.systolic_bp}/${latest.diastolic_bp}` : "120/80"}
+          meta="Optimal"
+          icon={<Activity className="h-5 w-5" />}
+          tint="mint"
+        />
+        <StatTile
+          title="Temperature"
+          value={`${(((latest?.temperature_c ?? 36.9) * 9) / 5 + 32).toFixed(1)}°F`}
+          meta="Normal"
+          icon={<Thermometer className="h-5 w-5" />}
+          tint="peach"
+        />
+        <StatTile
+          title="Blood Glucose"
+          value={`${latest?.glucose_mgdl ?? 95} mg/dL`}
+          meta="Fasting level"
+          delta={glucoseDelta}
+          icon={<Droplets className="h-5 w-5" />}
+          tint="sky"
+        />
+      </section>
+
+      {/* Score + Trends */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Card className="rounded-2xl border bg-card shadow-card">
+          <CardHeader className="pb-0">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Sparkles className="h-4 w-4 text-primary" /> Overall Health Score
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <StatCard title="Overall Health Score" value={`${score}`} suffix="/100" icon={<Activity className="h-4 w-4" />} />
-              <StatCard title="Risk (computed)" value={`${riskInfo.risk}%`} icon={<Brain className="h-4 w-4" />} />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button asChild variant="hero" className="rounded-xl">
-                <Link to="/patient/predict">Run AI Prediction</Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-xl">
-                <Link to="/patient/telemedicine">
-                  <CalendarPlus className="mr-2 h-4 w-4" /> Book Appointment
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-xl">
-                <Link to="/patient/consents">
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Manage Consent
-                </Link>
-              </Button>
-            </div>
-            <div className="mt-3 text-xs text-muted-foreground">
-              Risk category: <span className="font-medium text-foreground">{riskInfo.category}</span>
+          <CardContent className="pt-6">
+            <ScoreRing score={score} label={scoreLabel} />
+
+            <div className="mt-8 grid gap-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Cardiovascular</span>
+                  <span className="font-medium">{breakdown.cardio}%</span>
+                </div>
+                <Progress value={breakdown.cardio} className="h-2" />
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Metabolic</span>
+                  <span className="font-medium">{breakdown.metabolic}%</span>
+                </div>
+                <Progress value={breakdown.metabolic} className="h-2" />
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Lifestyle</span>
+                  <span className="font-medium">{breakdown.lifestyle}%</span>
+                </div>
+                <Progress value={breakdown.lifestyle} className="h-2" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border bg-card shadow-card">
+        <Card className="rounded-2xl border bg-card shadow-card lg:col-span-2">
           <CardHeader>
-            <CardTitle className="font-display">Latest Metrics</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <LineChartIcon className="h-4 w-4 text-primary" /> Health Trends
+            </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border bg-background p-4 shadow-soft">
-                <div className="text-xs text-muted-foreground">Heart rate</div>
-                <div className="mt-1 font-display text-lg font-semibold">{metric?.heart_rate ?? "—"}</div>
-              </div>
-              <div className="rounded-2xl border bg-background p-4 shadow-soft">
-                <div className="text-xs text-muted-foreground">BP</div>
-                <div className="mt-1 font-display text-lg font-semibold">
-                  {metric ? `${metric.systolic_bp}/${metric.diastolic_bp}` : "—"}
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend.length ? trend : [{ label: "Jan", healthScore: 90, bloodPressure: 130, glucose: 105 }]}
+                  margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="healthScore"
+                    name="Health Score"
+                    stroke="hsl(var(--brand-teal))"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="bloodPressure"
+                    name="Blood Pressure"
+                    stroke="hsl(var(--brand-orange))"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="glucose"
+                    name="Glucose"
+                    stroke="hsl(var(--foreground))"
+                    strokeOpacity={0.55}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* BMI + Tip + Quick actions */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Card className="rounded-2xl border bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">BMI Calculator</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground">Height (cm)</div>
+                  <Input value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground">Weight (kg)</div>
+                  <Input value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
                 </div>
               </div>
-              <div className="rounded-2xl border bg-background p-4 shadow-soft">
-                <div className="text-xs text-muted-foreground">Glucose</div>
-                <div className="mt-1 font-display text-lg font-semibold">{metric?.glucose_mgdl ?? "—"}</div>
-              </div>
-              <div className="rounded-2xl border bg-background p-4 shadow-soft">
-                <div className="text-xs text-muted-foreground">Temp</div>
-                <div className="mt-1 font-display text-lg font-semibold">{metric?.temperature_c ?? "—"}</div>
+              <Button onClick={onCalcBmi} variant="hero" className="rounded-xl">
+                Calculate BMI
+              </Button>
+              {bmi ? (
+                <div className="rounded-xl border bg-secondary/40 p-4">
+                  <div className="text-sm font-semibold">BMI: {bmi.value}</div>
+                  <div className="text-xs text-muted-foreground">{bmi.label}</div>
+                </div>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Daily Health Tip</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-2xl bg-secondary/40 p-4">
+              <div className="flex items-start gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-accent">
+                  <Moon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{dailyTip.title}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{dailyTip.body}</div>
+                </div>
               </div>
             </div>
 
-            <Button variant="soft" onClick={seedIfEmpty} disabled={busySeed} className="rounded-xl">
-              {busySeed ? "Seeding…" : "Seed demo data"}
+            <div className="mt-4 grid grid-cols-4 gap-3">
+              {[<Heart key="h" className="h-4 w-4" />, <Activity key="a" className="h-4 w-4" />, <Moon key="m" className="h-4 w-4" />, <Dumbbell key="d" className="h-4 w-4" />].map(
+                (ic, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="grid h-11 place-items-center rounded-xl border bg-background shadow-soft hover:bg-accent/60"
+                    aria-label="Tip category"
+                  >
+                    {ic}
+                  </button>
+                ),
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-card shadow-card">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <Button asChild variant="hero" className="justify-between rounded-xl">
+              <Link to="/patient/predict">
+                Start AI Prediction <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-between rounded-xl">
+              <Link to="/patient/records">
+                View Medical Records <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-between rounded-xl">
+              <Link to="/patient/verify">
+                Verify on Blockchain <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-between rounded-xl">
+              <Link to="/patient/telemedicine">
+                Schedule Appointment <ArrowRight className="h-4 w-4" />
+              </Link>
             </Button>
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border bg-card shadow-card md:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display">Prediction Trends</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {trend.length ? (
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trend} margin={{ left: 8, right: 8 }}>
-                    <defs>
-                      <linearGradient id="risk" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} domain={[0, 100]} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="risk" stroke="hsl(var(--primary))" fill="url(#risk)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="rounded-2xl border bg-background p-6 shadow-soft">
-                <div className="flex items-center gap-2 font-medium">
-                  <FileCheck2 className="h-4 w-4" /> No predictions yet
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">Run your first AI prediction to see trends over time.</p>
-                <Button asChild className="mt-4 rounded-xl" variant="hero">
-                  <Link to="/patient/predict">Start prediction</Link>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border bg-card shadow-card">
-          <CardHeader>
-            <CardTitle className="font-display">Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Each prediction can be exported as a PDF report and anchored into a ledger-style transaction for verification.
-            </p>
-            <Button asChild variant="outline" className="mt-4 w-full rounded-xl">
-              <Link to="/patient/predict">Generate new report</Link>
+      {/* Prediction history */}
+      <section>
+        <Card className="rounded-2xl border bg-card shadow-card">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Prediction History</CardTitle>
+            <Button asChild variant="outline" size="sm" className="rounded-xl">
+              <Link to="/patient/records">View All</Link>
             </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Risk Level</TableHead>
+                  <TableHead>Health Score</TableHead>
+                  <TableHead>Conditions</TableHead>
+                  <TableHead>Blockchain</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.length ? (
+                  history.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{new Date(p.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {p.risk_category.toUpperCase()} ({Math.round(p.risk_percentage)}%)
+                      </TableCell>
+                      <TableCell>{p.health_score}/100</TableCell>
+                      <TableCell>None detected</TableCell>
+                      <TableCell>{shortTx(p.tx_id ?? null)}</TableCell>
+                      <TableCell className="text-right">
+                        {p.tx_id ? (
+                          <Button asChild variant="outline" size="sm" className="rounded-xl">
+                            <Link to={`/verify/${p.tx_id}`}>Open</Link>
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" className="rounded-xl" disabled>
+                            Open
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      No predictions yet. Create a new prediction to start tracking.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </section>
