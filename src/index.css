@@ -8,89 +8,102 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
+    /* Brand (healthcare SaaS) */
+    --primary: 214 90% 52%;
     --primary-foreground: 210 40% 98%;
+    --primary-glow: 191 92% 45%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 38% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 34% 95%;
+    --muted-foreground: 217 15% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 206 55% 94%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 28% 90%;
+    --input: 214 28% 90%;
+    --ring: 214 90% 52%;
 
-    --radius: 0.5rem;
+    --radius: 0.9rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Depth + gradients */
+    --shadow-card: 0 18px 50px -22px hsl(var(--foreground) / 0.22);
+    --shadow-soft: 0 10px 30px -18px hsl(var(--foreground) / 0.18);
+    --gradient-hero: radial-gradient(1200px 600px at 15% 10%, hsl(var(--primary-glow) / 0.22), transparent 60%),
+      radial-gradient(900px 540px at 85% 0%, hsl(var(--primary) / 0.20), transparent 62%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Sidebar tokens (match brand) */
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222 32% 20%;
+    --sidebar-primary: 214 90% 52%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 206 55% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 28% 90%;
+    --sidebar-ring: 191 92% 45%;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Typography */
+    --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+      "Segoe UI Emoji";
+    --font-display: "Sora", ui-sans-serif, system-ui;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 47% 9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 191 92% 45%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 214 90% 52%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 223 28% 14%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 223 28% 14%;
+    --muted-foreground: 217 16% 72%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 223 26% 16%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 223 24% 18%;
+    --input: 223 24% 18%;
+    --ring: 191 92% 45%;
+
+    --shadow-card: 0 26px 70px -35px hsl(0 0% 0% / 0.45);
+    --shadow-soft: 0 16px 46px -26px hsl(0 0% 0% / 0.42);
+
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 210 40% 95%;
+    --sidebar-primary: 191 92% 45%;
+    --sidebar-primary-foreground: 222 47% 7%;
+    --sidebar-accent: 223 26% 16%;
+    --sidebar-accent-foreground: 210 40% 95%;
+    --sidebar-border: 223 24% 18%;
+    --sidebar-ring: 214 90% 52%;
   }
 }
 
@@ -99,7 +112,25 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-family: var(--font-sans);
+  }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-hero {
+    background-image: var(--gradient-hero);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
   }
 }
