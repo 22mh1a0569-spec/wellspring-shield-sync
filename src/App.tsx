@@ -16,6 +16,8 @@ import PatientDashboard from "@/pages/patient/PatientDashboard";
 import PatientPrediction from "@/pages/patient/PatientPrediction";
 import PatientConsents from "@/pages/patient/PatientConsents";
 import PatientTelemedicine from "@/pages/patient/PatientTelemedicine";
+import PatientRecords from "@/pages/patient/PatientRecords";
+import PatientVerify from "@/pages/patient/PatientVerify";
 import DoctorDashboard from "@/pages/doctor/DoctorDashboard";
 import DoctorTelemedicine from "@/pages/doctor/DoctorTelemedicine";
 
@@ -50,6 +52,26 @@ const App = () => (
                 <ProtectedRoute allow={["patient"]}>
                   <DashboardLayout>
                     <PatientPrediction />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/patient/records"
+              element={
+                <ProtectedRoute allow={["patient"]}>
+                  <DashboardLayout>
+                    <PatientRecords />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/patient/verify"
+              element={
+                <ProtectedRoute allow={["patient"]}>
+                  <DashboardLayout>
+                    <PatientVerify />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

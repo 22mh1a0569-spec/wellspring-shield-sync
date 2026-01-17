@@ -51,10 +51,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { to: "/doctor/predictions", label: "Predictions", icon: <ClipboardCheck /> },
       ];
     }
+
     return [
       { to: "/patient", label: "Dashboard", icon: <LayoutDashboard /> },
       { to: "/patient/predict", label: "AI Prediction", icon: <HeartPulse /> },
-      { to: "/patient/consents", label: "Consent", icon: <ClipboardCheck /> },
+      { to: "/patient/records", label: "Medical Records", icon: <ClipboardCheck /> },
+      { to: "/patient/verify", label: "Blockchain Verify", icon: <ClipboardCheck /> },
+      { to: "/patient/telemedicine", label: "Appointments", icon: <Video /> },
+      { to: "/patient/consents", label: "Access Control", icon: <ClipboardCheck /> },
       { to: "/patient/telemedicine", label: "Telemedicine", icon: <Video /> },
     ];
   }, [role]);
