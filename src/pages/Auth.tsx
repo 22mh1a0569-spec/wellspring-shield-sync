@@ -12,10 +12,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { HealthChainBrand } from "@/components/HealthChainBrand";
 
-const emailSchema = z.string().email("Enter a valid email");
-const passwordSchema = z.string().min(8, "Minimum 8 characters");
+const emailSchema = z.string().trim().email("Enter a valid email").max(255, "Email is too long");
+const passwordSchema = z.string().min(8, "Minimum 8 characters").max(128, "Password is too long");
 
 type Role = "patient" | "doctor";
+
+function humanizeError(err: unknown): string {
+  if (err instanceof z.ZodError) return err.issues?.[0]?.message ?? "Please check your inputs.";
+
+  const anyErr = err as any;
+  const msg = (anyErr?.message ?? anyErr?.error_description ?? anyErr?.error ?? "").toString();
+
+  if (!msg) return "Something went wrong. Please try again.";
+
+  // Common auth messages → user-friendly copy
+  if (msg.toLowerCase().includes("invalid login credentials")) return "Incorrect email or password.";
+  if (msg.toLowerCase().includes("user already registered")) return "This email is already registered. Please sign in.";
+  if (msg.toLowerCase().includes("password should be at least")) return "Password must be at least 8 characters.";
+
+  return msg;
+}
 
 function RoleCard({
   active,
@@ -55,8 +71,7 @@ export default function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   const subtitle = useMemo(
-    () =>
-      tab === "login" ? "Sign in to access your health dashboard" : "Join HealthChain for secure healthcare",
+    () => (tab === "login" ? "Sign in to access your health dashboard" : "Join HealthChain for secure healthcare"),
     [tab],
   );
 
@@ -76,7 +91,7 @@ export default function AuthPage() {
       if (error) throw error;
       if (data.user?.id) await afterAuthRedirect(data.user.id);
     } catch (e: any) {
-      toast({ title: "Sign in failed", description: e?.message ?? "Please try again.", variant: "destructive" });
+      toast({ title: "Sign in failed", description: humanizeError(e), variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -118,7 +133,7 @@ export default function AuthPage() {
       toast({ title: "Account created", description: "Welcome to HealthChain." });
       await afterAuthRedirect(userId);
     } catch (e: any) {
-      toast({ title: "Sign up failed", description: e?.message ?? "Please try again.", variant: "destructive" });
+      toast({ title: "Sign up failed", description: humanizeError(e), variant: "destructive" });
     } finally {
       setBusy(false);
     }
