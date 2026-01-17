@@ -8,54 +8,62 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    /* Page background + text */
+    --background: 195 33% 97%;
     --foreground: 222 47% 11%;
 
+    /* Surfaces */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Brand (healthcare SaaS) */
-    --primary: 214 90% 52%;
-    --primary-foreground: 210 40% 98%;
-    --primary-glow: 191 92% 45%;
+    /* Brand palette (HealthChain) */
+    --brand-teal: 170 74% 38%;
+    --brand-teal-2: 190 86% 40%;
+    --brand-orange: 18 88% 58%;
 
-    --secondary: 210 38% 96%;
+    --primary: var(--brand-teal);
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: var(--brand-teal-2);
+
+    --secondary: 210 28% 95%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 34% 95%;
-    --muted-foreground: 217 15% 45%;
+    --muted: 210 28% 95%;
+    --muted-foreground: 215 16% 45%;
 
-    --accent: 206 55% 94%;
+    --accent: 172 48% 92%;
     --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214 28% 90%;
-    --input: 214 28% 90%;
-    --ring: 214 90% 52%;
+    --border: 214 22% 89%;
+    --input: 214 22% 89%;
+    --ring: var(--brand-teal);
 
-    --radius: 0.9rem;
+    --radius: 1.1rem;
 
     /* Depth + gradients */
-    --shadow-card: 0 18px 50px -22px hsl(var(--foreground) / 0.22);
-    --shadow-soft: 0 10px 30px -18px hsl(var(--foreground) / 0.18);
-    --gradient-hero: radial-gradient(1200px 600px at 15% 10%, hsl(var(--primary-glow) / 0.22), transparent 60%),
-      radial-gradient(900px 540px at 85% 0%, hsl(var(--primary) / 0.20), transparent 62%),
+    --shadow-card: 0 18px 50px -26px hsl(222 47% 11% / 0.18);
+    --shadow-soft: 0 10px 28px -20px hsl(222 47% 11% / 0.14);
+
+    --gradient-primary: linear-gradient(90deg, hsl(var(--brand-teal)), hsl(var(--brand-teal-2)), hsl(var(--brand-orange)));
+    --gradient-hero: radial-gradient(1100px 700px at 14% 18%, hsl(var(--brand-teal-2) / 0.18), transparent 60%),
+      radial-gradient(900px 560px at 86% 0%, hsl(var(--brand-teal) / 0.12), transparent 62%),
       linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
 
-    /* Sidebar tokens (match brand) */
-    --sidebar-background: 210 40% 98%;
+    /* Sidebar tokens */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 32% 20%;
-    --sidebar-primary: 214 90% 52%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 206 55% 94%;
+    --sidebar-primary: var(--brand-teal);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 28% 95%;
     --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 28% 90%;
-    --sidebar-ring: 191 92% 45%;
+    --sidebar-border: 214 22% 89%;
+    --sidebar-ring: var(--brand-teal-2);
 
     /* Typography */
     --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
@@ -64,18 +72,22 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222 47% 7%;
+    --background: 222 40% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 222 47% 9%;
+    --card: 222 40% 9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222 47% 9%;
+    --popover: 222 40% 9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 191 92% 45%;
-    --primary-foreground: 222 47% 7%;
-    --primary-glow: 214 90% 52%;
+    --brand-teal: 170 74% 46%;
+    --brand-teal-2: 190 86% 52%;
+    --brand-orange: 18 88% 60%;
+
+    --primary: var(--brand-teal-2);
+    --primary-foreground: 222 40% 7%;
+    --primary-glow: var(--brand-teal);
 
     --secondary: 223 28% 14%;
     --secondary-foreground: 210 40% 98%;
@@ -91,19 +103,24 @@ All colors MUST be HSL.
 
     --border: 223 24% 18%;
     --input: 223 24% 18%;
-    --ring: 191 92% 45%;
+    --ring: var(--brand-teal-2);
 
     --shadow-card: 0 26px 70px -35px hsl(0 0% 0% / 0.45);
     --shadow-soft: 0 16px 46px -26px hsl(0 0% 0% / 0.42);
 
-    --sidebar-background: 222 47% 7%;
+    --gradient-primary: linear-gradient(90deg, hsl(var(--brand-teal)), hsl(var(--brand-teal-2)), hsl(var(--brand-orange)));
+    --gradient-hero: radial-gradient(1100px 700px at 14% 18%, hsl(var(--brand-teal-2) / 0.20), transparent 60%),
+      radial-gradient(900px 560px at 86% 0%, hsl(var(--brand-teal) / 0.14), transparent 62%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+
+    --sidebar-background: 222 40% 7%;
     --sidebar-foreground: 210 40% 95%;
-    --sidebar-primary: 191 92% 45%;
-    --sidebar-primary-foreground: 222 47% 7%;
+    --sidebar-primary: var(--brand-teal-2);
+    --sidebar-primary-foreground: 222 40% 7%;
     --sidebar-accent: 223 26% 16%;
     --sidebar-accent-foreground: 210 40% 95%;
     --sidebar-border: 223 24% 18%;
-    --sidebar-ring: 214 90% 52%;
+    --sidebar-ring: var(--brand-teal);
   }
 }
 

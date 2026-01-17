@@ -88,20 +88,20 @@ export default function VerifyRecord() {
   return (
     <div className="min-h-screen bg-hero">
       <div className="mx-auto max-w-4xl px-6 py-10 animate-fade-in">
-        <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+        <Card className="border bg-card shadow-card">
           <CardHeader>
-            <CardTitle className="font-display">Blockchain Verification</CardTitle>
+            <CardTitle className="font-display">Blockchain Record Verification</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="rounded-xl border bg-background/60 p-5 shadow-soft">
-              <div className="flex items-center gap-2 font-medium">
+            <div className="rounded-2xl border bg-background p-6 shadow-soft">
+              <div className="flex items-center gap-2 font-semibold">
                 <ShieldCheck className="h-4 w-4" /> {banner.title}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">{banner.desc}</div>
             </div>
 
             {tx ? (
-              <div className="rounded-xl border bg-background/60 p-5 shadow-soft">
+              <div className="rounded-2xl border bg-background p-6 shadow-soft">
                 <div className="text-xs text-muted-foreground">Transaction ID</div>
                 <div className="mt-1 font-mono text-sm">{tx.tx_id}</div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -118,14 +118,14 @@ export default function VerifyRecord() {
             ) : null}
 
             {pred ? (
-              <div className="rounded-xl border bg-background/60 p-5 shadow-soft">
-                <div className="text-sm font-medium">Report snapshot</div>
+              <div className="rounded-2xl border bg-background p-6 shadow-soft">
+                <div className="text-sm font-semibold">Report snapshot</div>
                 <div className="mt-2 grid gap-2 text-sm">
                   <div>
-                    Risk: <span className="font-medium">{pred.risk_percentage}% ({pred.risk_category})</span>
+                    Risk: <span className="font-semibold">{pred.risk_percentage}% ({pred.risk_category})</span>
                   </div>
                   <div>
-                    Score: <span className="font-medium">{pred.health_score}/100</span>
+                    Score: <span className="font-semibold">{pred.health_score}/100</span>
                   </div>
                   <div className="text-xs text-muted-foreground">Created: {new Date(pred.created_at).toLocaleString()}</div>
                 </div>

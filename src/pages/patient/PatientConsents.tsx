@@ -79,9 +79,9 @@ export default function PatientConsents() {
 
   return (
     <div className="grid gap-6">
-      <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+      <Card className="border bg-card shadow-card">
         <CardHeader>
-          <CardTitle className="font-display">Consent-based Access Control</CardTitle>
+          <CardTitle className="font-display">Consent-Based Access Control</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
           <div className="space-y-2">
@@ -90,20 +90,20 @@ export default function PatientConsents() {
             </div>
             <Input value={doctorId} onChange={(e) => setDoctorId(e.target.value)} placeholder="Doctor user id (UUID)" />
           </div>
-          <Button variant="hero" onClick={request}>
+          <Button variant="hero" onClick={request} className="rounded-xl">
             Request access
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="border bg-card/70 shadow-card backdrop-blur-sm">
+      <Card className="border bg-card shadow-card">
         <CardHeader>
           <CardTitle className="font-display">Your consents</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
           {rows.length ? (
             rows.map((r) => (
-              <div key={r.id} className="flex flex-col gap-3 rounded-xl border bg-background/60 p-4 shadow-soft md:flex-row md:items-center md:justify-between">
+              <div key={r.id} className="flex flex-col gap-3 rounded-2xl border bg-background p-5 shadow-soft md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="inline-flex items-center gap-2 font-medium">
                     <ShieldCheck className="h-4 w-4" /> Doctor: <span className="font-mono text-sm">{r.doctor_id.slice(0, 8)}…</span>
@@ -113,21 +113,17 @@ export default function PatientConsents() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setStatus(r.id, "granted")}
-                    disabled={r.status === "granted"}
-                  >
+                  <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setStatus(r.id, "granted")} disabled={r.status === "granted"}>
                     <CheckCircle2 className="mr-2 h-4 w-4" /> Grant
                   </Button>
-                  <Button variant="soft" size="sm" onClick={() => setStatus(r.id, "revoked")}>
+                  <Button variant="soft" size="sm" className="rounded-xl" onClick={() => setStatus(r.id, "revoked")}>
                     <ShieldOff className="mr-2 h-4 w-4" /> Revoke
                   </Button>
                 </div>
               </div>
             ))
           ) : (
-            <div className="rounded-xl border bg-background/60 p-6 text-sm text-muted-foreground shadow-soft">
-              No consent requests yet.
-            </div>
+            <div className="rounded-2xl border bg-background p-6 text-sm text-muted-foreground shadow-soft">No consent requests yet.</div>
           )}
         </CardContent>
       </Card>
