@@ -143,46 +143,59 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SidebarGroup>
           </SidebarContent>
 
-            <SidebarFooter>
-              <div className="grid w-full gap-2">
-                <UserSidebarCard
-                  userId={user?.id ?? null}
-                  name={profile?.full_name ?? null}
-                  avatarUrl={profile?.avatar_url ?? null}
-                  email={user?.email ?? null}
-                  role={role ?? null}
-                  onProfileUpdated={(next) =>
-                    setProfile((prev) => ({
-                      full_name: prev?.full_name ?? null,
-                      avatar_url: next.avatarUrl ?? prev?.avatar_url ?? null,
-                    }))
-                  }
-                />
+          <SidebarFooter>
+            <div className="grid w-full gap-2">
+              <UserSidebarCard
+                userId={user?.id ?? null}
+                name={profile?.full_name ?? null}
+                avatarUrl={profile?.avatar_url ?? null}
+                email={user?.email ?? null}
+                role={role ?? null}
+                onProfileUpdated={(next) =>
+                  setProfile((prev) => ({
+                    full_name: prev?.full_name ?? null,
+                    avatar_url: next.avatarUrl ?? prev?.avatar_url ?? null,
+                  }))
+                }
+              />
 
-                <Button variant="outline" size="sm" className="h-10 w-full justify-between rounded-xl" asChild>
-                  <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
-                    <span className="inline-flex items-center gap-2">
-                      <Bell className="h-4 w-4" /> Notifications
-                    </span>
-                    {unread ? <Badge variant="secondary">{unread}</Badge> : <span />}
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="soft"
-                  size="sm"
-                  onClick={async () => {
-                    await signOut();
-                  }}
-                  className="h-10 w-full justify-between rounded-xl"
-                >
+              <Button
+                variant="outline"
+                size="sm"
+                className={
+                  "h-10 w-full justify-between rounded-xl px-3 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0"
+                }
+                asChild
+              >
+                <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
                   <span className="inline-flex items-center gap-2">
-                    <LogOut className="h-4 w-4" /> Sign out
+                    <Bell className="h-4 w-4" />
+                    <span className="group-data-[state=collapsed]:hidden">Notifications</span>
                   </span>
-                  <span className="min-w-0 truncate text-xs text-muted-foreground">{user?.email}</span>
-                </Button>
-              </div>
-            </SidebarFooter>
+                  <span className="group-data-[state=collapsed]:hidden">
+                    {unread ? <Badge variant="secondary">{unread}</Badge> : <span />}
+                  </span>
+                </Link>
+              </Button>
+
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={async () => {
+                  await signOut();
+                }}
+                className={
+                  "h-10 w-full justify-between rounded-xl px-3 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:w-10 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:px-0"
+                }
+              >
+                <span className="inline-flex items-center gap-2">
+                  <LogOut className="h-4 w-4" />
+                  <span className="group-data-[state=collapsed]:hidden">Sign out</span>
+                </span>
+                <span className="min-w-0 truncate text-xs text-muted-foreground group-data-[state=collapsed]:hidden">{user?.email}</span>
+              </Button>
+            </div>
+          </SidebarFooter>
         </Sidebar>
 
         <SidebarInset className="bg-transparent">

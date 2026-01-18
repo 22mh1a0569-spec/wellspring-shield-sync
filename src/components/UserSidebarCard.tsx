@@ -88,7 +88,13 @@ export function UserSidebarCard({
   };
 
   return (
-    <div className={cn("w-full rounded-2xl border bg-card px-3 py-2 shadow-soft", className)}>
+    <div
+      className={cn(
+        "w-full rounded-2xl border bg-card shadow-soft",
+        "px-3 py-2 group-data-[state=collapsed]:p-2",
+        className,
+      )}
+    >
       <div className="flex items-center gap-3">
         <div className="relative">
           <Avatar className="h-9 w-9 rounded-2xl">
@@ -115,7 +121,10 @@ export function UserSidebarCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute -bottom-2 -right-2 h-6 w-6 rounded-xl border bg-background/80 backdrop-blur-sm"
+                className={cn(
+                  "absolute -bottom-2 -right-2 h-6 w-6 rounded-xl border bg-background/80 backdrop-blur-sm",
+                  "group-data-[state=collapsed]:hidden",
+                )}
                 disabled={uploading}
                 onClick={() => inputRef.current?.click()}
                 title={uploading ? "Uploading…" : "Change avatar"}
@@ -126,13 +135,13 @@ export function UserSidebarCard({
           ) : null}
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 group-data-[state=collapsed]:hidden">
           <div className="truncate font-display text-sm font-semibold">{displayName}</div>
           <div className="truncate text-xs text-muted-foreground">{subtitle}</div>
         </div>
 
         {role ? (
-          <Badge variant="secondary" className="shrink-0">
+          <Badge variant="secondary" className="shrink-0 group-data-[state=collapsed]:hidden">
             {role}
           </Badge>
         ) : null}
