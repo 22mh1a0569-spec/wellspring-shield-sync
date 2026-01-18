@@ -88,12 +88,12 @@ export function UserSidebarCard({
   };
 
   return (
-    <div className={cn("w-full min-h-14 rounded-2xl border bg-card p-3 shadow-soft", className)}>
+    <div className={cn("w-full rounded-2xl border bg-card px-3 py-2 shadow-soft", className)}>
       <div className="flex items-center gap-3">
         <div className="relative">
-          <Avatar className="h-10 w-10 rounded-2xl">
+          <Avatar className="h-9 w-9 rounded-2xl">
             {localAvatar ? <AvatarImage src={localAvatar} alt={`${displayName} avatar`} /> : null}
-            <AvatarFallback className="rounded-2xl bg-muted font-medium">
+            <AvatarFallback className="rounded-2xl bg-muted text-sm font-medium">
               {initialsFromName(displayName)}
             </AvatarFallback>
           </Avatar>
@@ -115,12 +115,12 @@ export function UserSidebarCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute -bottom-2 -right-2 h-7 w-7 rounded-xl border bg-background/80 backdrop-blur-sm"
+                className="absolute -bottom-2 -right-2 h-6 w-6 rounded-xl border bg-background/80 backdrop-blur-sm"
                 disabled={uploading}
                 onClick={() => inputRef.current?.click()}
                 title={uploading ? "Uploading…" : "Change avatar"}
               >
-                <Camera className="h-4 w-4" />
+                <Camera className="h-3.5 w-3.5" />
               </Button>
             </>
           ) : null}

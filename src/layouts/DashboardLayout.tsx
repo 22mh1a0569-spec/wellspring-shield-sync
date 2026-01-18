@@ -159,7 +159,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   }
                 />
 
-                <Button variant="outline" className="h-11 w-full justify-between rounded-xl" asChild>
+                <Button variant="outline" size="sm" className="h-10 w-full justify-between rounded-xl" asChild>
                   <Link to={role === "doctor" ? "/doctor/notifications" : "/patient/notifications"}>
                     <span className="inline-flex items-center gap-2">
                       <Bell className="h-4 w-4" /> Notifications
@@ -170,10 +170,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 <Button
                   variant="soft"
+                  size="sm"
                   onClick={async () => {
                     await signOut();
                   }}
-                  className="h-11 w-full justify-between rounded-xl"
+                  className="h-10 w-full justify-between rounded-xl"
                 >
                   <span className="inline-flex items-center gap-2">
                     <LogOut className="h-4 w-4" /> Sign out
