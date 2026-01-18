@@ -112,35 +112,61 @@ async function qrPngDataUrl(value: string) {
   });
 }
 
-async function addVerificationBlock(doc: jsPDF, opts: { txId: string; createdAtIso?: string }) {
-  const { txId, createdAtIso } = opts;
+async function addVerificationBlock(
+  doc: jsPDF,
+  opts: { txId: string; createdAtIso?: string; startY: number },
+) {
+  const { txId, createdAtIso, startY } = opts;
   const verifyUrl = `${window.location.origin}/verify/${txId}`;
   const qr = await qrPngDataUrl(verifyUrl);
 
-  const startY = 148;
+  const pageH = doc.internal.pageSize.getHeight();
+  const bottomY = pageH - 11;
+
+  // If we don't have enough space for the block + QR, move to a new page.
+  const requiredH = 70;
+  let y = startY;
+  if (y + requiredH > bottomY - 10) {
+    doc.addPage();
+    y = 18;
+  }
+
+  const leftX = 14;
+  const qrX = 155;
+  const qrY = y + 6;
+  const qrSize = 40;
+  const textWidth = 128; // leave room for QR
+
   doc.setFontSize(12);
-  doc.text("Verification (integrity proof)", 14, startY);
+  doc.text("Verification (integrity proof)", leftX, y);
 
   doc.setFontSize(10);
   const explanation =
     "What is verified: this PDF links to a ledger transaction that anchors a SHA-256 hash of the report payload (inputs + risk + score + timestamp). The verification page recomputes the hash and compares it with the stored value.";
-  doc.text(doc.splitTextToSize(explanation, 120), 14, startY + 8);
+  const explanationLines = doc.splitTextToSize(explanation, textWidth);
+  doc.text(explanationLines, leftX, y + 8);
 
-  const metaY = startY + 34;
-  doc.text(`Transaction ID: ${txId}`, 14, metaY);
-  if (createdAtIso) doc.text(`Report timestamp: ${new Date(createdAtIso).toLocaleString()}`, 14, metaY + 6);
-  doc.text(`Verify URL: ${verifyUrl}`, 14, metaY + 12);
+  const lineH = 5.5;
+  const metaY = y + 8 + explanationLines.length * lineH + 8;
+
+  doc.text(`Transaction ID: ${txId}`, leftX, metaY);
+  if (createdAtIso) {
+    doc.text(`Report timestamp: ${new Date(createdAtIso).toLocaleString()}`, leftX, metaY + 6);
+  }
+
+  const verifyLines = doc.splitTextToSize(`Verify URL: ${verifyUrl}`, textWidth);
+  doc.text(verifyLines, leftX, metaY + 12);
 
   // QR (right side)
-  doc.addImage(qr, "PNG", 155, startY + 6, 40, 40);
+  doc.addImage(qr, "PNG", qrX, qrY, qrSize, qrSize);
   doc.setFontSize(8);
-  doc.text("Scan to verify", 163, startY + 50);
+  doc.text("Scan to verify", qrX + 8, qrY + qrSize + 8);
 
-  // Privacy disclaimer
+  // Privacy disclaimer (always pinned to bottom of the current page)
   const privacy =
     "Privacy: Scanning opens a secure verification page. Full report details require sign-in and patient consent. Do not share this PDF publicly.";
   doc.setFontSize(9);
-  doc.text(doc.splitTextToSize(privacy, 180), 14, 286);
+  doc.text(doc.splitTextToSize(privacy, 180), leftX, bottomY);
 }
 
 type PredictionHistoryRow = {
@@ -195,13 +221,16 @@ async function downloadPredictionPdfFromRow(opts: {
   ];
   lines.forEach((l, i) => doc.text(l, 14, 76 + i * 7));
 
+  // Next content starts after the last input line.
+  const nextY = 76 + lines.length * 7 + 10;
+
   if (txId) {
-    await addVerificationBlock(doc, { txId, createdAtIso: prediction.created_at });
+    await addVerificationBlock(doc, { txId, createdAtIso: prediction.created_at, startY: nextY });
   } else {
     const privacy =
       "Privacy: This report may contain sensitive medical information. Share only with trusted healthcare providers.";
     doc.setFontSize(9);
-    doc.text(doc.splitTextToSize(privacy, 180), 14, 286);
+    doc.text(doc.splitTextToSize(privacy, 180), 14, doc.internal.pageSize.getHeight() - 11);
   }
 
   doc.save(
@@ -386,18 +415,29 @@ export default function PatientPrediction() {
     ];
     lines.forEach((l, i) => doc.text(l, 14, 76 + i * 7));
 
+    let nextY = 76 + lines.length * 7 + 10;
+
     if (remarks.trim()) {
-      doc.text("Remarks", 14, 112);
-      doc.text(doc.splitTextToSize(remarks.trim(), 180), 14, 120);
+      // If remarks don't fit on the current page, move them to a new one.
+      const pageH = doc.internal.pageSize.getHeight();
+      if (nextY + 30 > pageH - 20) {
+        doc.addPage();
+        nextY = 18;
+      }
+
+      doc.text("Remarks", 14, nextY);
+      const remarkLines = doc.splitTextToSize(remarks.trim(), 180);
+      doc.text(remarkLines, 14, nextY + 8);
+      nextY = nextY + 8 + remarkLines.length * 5.5 + 10;
     }
 
     if (txId) {
-      await addVerificationBlock(doc, { txId, createdAtIso: new Date().toISOString() });
+      await addVerificationBlock(doc, { txId, createdAtIso: new Date().toISOString(), startY: nextY });
     } else {
       const privacy =
         "Privacy: This report may contain sensitive medical information. Share only with trusted healthcare providers.";
       doc.setFontSize(9);
-      doc.text(doc.splitTextToSize(privacy, 180), 14, 286);
+      doc.text(doc.splitTextToSize(privacy, 180), 14, doc.internal.pageSize.getHeight() - 11);
     }
 
     doc.save(`smart-healthcare-report-${Date.now()}.pdf`);
