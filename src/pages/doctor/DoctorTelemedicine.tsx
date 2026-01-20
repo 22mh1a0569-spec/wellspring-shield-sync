@@ -1,12 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
+import { FileDown } from "lucide-react";
+import { nanoid } from "nanoid";
+import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { downloadConsultationNotesPdf, sha256 as sha256Hex } from "@/lib/pdf/consultationNotesPdf";
 
 type Appointment = {
   id: string;
@@ -21,6 +26,22 @@ type Msg = { id: string; sender_id: string; body: string; created_at: string };
 
 type Availability = { doctor_id: string; is_available: boolean; note: string | null };
 
+type NoteRow = {
+  id: string;
+  appointment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  diagnosis: string | null;
+  recommendations: string | null;
+  is_final: boolean;
+  finalized_at: string | null;
+};
+
+const noteSchema = z.object({
+  diagnosis: z.string().trim().max(2000).optional(),
+  recommendations: z.string().trim().max(4000).optional(),
+});
+
 export default function DoctorTelemedicine() {
   const { user } = useAuth();
   const [availability, setAvailability] = useState<Availability | null>(null);
@@ -29,6 +50,12 @@ export default function DoctorTelemedicine() {
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [message, setMessage] = useState("");
+
+  const [note, setNote] = useState<NoteRow | null>(null);
+  const [noteTxId, setNoteTxId] = useState<string | null>(null);
+  const [diagnosis, setDiagnosis] = useState("");
+  const [recommendations, setRecommendations] = useState("");
+  const canEditNote = useMemo(() => !note?.is_final, [note?.is_final]);
 
   const refresh = async () => {
     if (!user?.id) return;
@@ -54,6 +81,10 @@ export default function DoctorTelemedicine() {
   useEffect(() => {
     if (!active?.id || !user?.id) {
       setMessages([]);
+      setNote(null);
+      setNoteTxId(null);
+      setDiagnosis("");
+      setRecommendations("");
       return;
     }
 
@@ -63,6 +94,33 @@ export default function DoctorTelemedicine() {
       .eq("appointment_id", active.id)
       .order("created_at", { ascending: true })
       .then(({ data }) => setMessages((data as any) ?? []));
+
+    // Load existing note (draft or finalized)
+    supabase
+      .from("appointment_notes")
+      .select("id,appointment_id,doctor_id,patient_id,diagnosis,recommendations,is_final,finalized_at")
+      .eq("appointment_id", active.id)
+      .maybeSingle()
+      .then(async ({ data }) => {
+        const n = (data as any) as NoteRow | null;
+        setNote(n);
+        setDiagnosis(n?.diagnosis ?? "");
+        setRecommendations(n?.recommendations ?? "");
+
+        if (!n?.id) {
+          setNoteTxId(null);
+          return;
+        }
+
+        const { data: tx } = await supabase
+          .from("ledger_transactions")
+          .select("tx_id")
+          .eq("note_id", n.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setNoteTxId((tx as any)?.tx_id ?? null);
+      });
 
     const channel = supabase
       .channel(`chat:${active.id}`)
@@ -101,6 +159,85 @@ export default function DoctorTelemedicine() {
       body: text,
     });
     if (error) toast({ title: "Message failed", description: error.message, variant: "destructive" });
+  };
+
+  const saveDraft = async (finalize: boolean) => {
+    if (!user?.id || !active?.id) return;
+
+    try {
+      const parsed = noteSchema.parse({ diagnosis, recommendations });
+      const nowIso = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from("appointment_notes")
+        .upsert(
+          {
+            appointment_id: active.id,
+            doctor_id: user.id,
+            patient_id: active.patient_id,
+            diagnosis: parsed.diagnosis?.trim() || null,
+            recommendations: parsed.recommendations?.trim() || null,
+            is_final: finalize ? true : false,
+            finalized_at: finalize ? nowIso : null,
+          },
+          { onConflict: "appointment_id" },
+        )
+        .select("id,appointment_id,doctor_id,patient_id,diagnosis,recommendations,is_final,finalized_at")
+        .single();
+
+      if (error) throw error;
+      setNote(data as any);
+
+      if (!finalize) {
+        toast({ title: "Draft saved", description: "Consultation notes draft saved." });
+        return;
+      }
+
+      // Anchor finalized notes into the ledger
+      const payload = JSON.stringify({
+        appointment_id: (data as any).appointment_id,
+        note_id: (data as any).id,
+        patient_id: (data as any).patient_id,
+        doctor_id: (data as any).doctor_id,
+        diagnosis: (data as any).diagnosis ?? "",
+        recommendations: (data as any).recommendations ?? "",
+        finalized_at: (data as any).finalized_at ?? nowIso,
+      });
+      const payloadHash = await sha256Hex(payload);
+
+      const { data: lastTx } = await supabase
+        .from("ledger_transactions")
+        .select("payload_hash")
+        .eq("patient_id", active.patient_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const nextTxId = `tx_${nanoid(10)}`;
+      const { error: txErr } = await supabase.from("ledger_transactions").insert({
+        prediction_id: null,
+        note_id: (data as any).id,
+        appointment_id: active.id,
+        patient_id: active.patient_id,
+        created_by: user.id,
+        tx_id: nextTxId,
+        prev_hash: (lastTx as any)?.payload_hash ?? null,
+        payload_hash: payloadHash,
+      });
+      if (txErr) throw txErr;
+
+      setNoteTxId(nextTxId);
+
+      // Mark appointment complete (notes finalized)
+      await supabase
+        .from("appointments")
+        .update({ status: "completed", ended_at: nowIso })
+        .eq("id", active.id);
+
+      toast({ title: "Finalized", description: "Notes finalized and anchored into the verification ledger." });
+    } catch (e: any) {
+      toast({ title: "Could not save notes", description: e?.message ?? "Try again", variant: "destructive" });
+    }
   };
 
   return (
@@ -153,6 +290,96 @@ export default function DoctorTelemedicine() {
 
             {active ? (
               <div className="mt-4 grid gap-3 rounded-2xl border bg-background p-5 shadow-soft">
+                <div className="font-semibold">Consultation</div>
+
+                <div className="rounded-2xl border bg-card p-4 shadow-soft">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Doctor notes</div>
+                      <div className="text-xs text-muted-foreground">
+                        Save drafts anytime; finalize to publish to the patient and generate a verification hash.
+                      </div>
+                    </div>
+                    {note?.is_final && note?.finalized_at && noteTxId ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={() => {
+                          downloadConsultationNotesPdf({
+                            patientLabel: active.patient_id,
+                            txId: noteTxId,
+                            payload: {
+                              appointment_id: active.id,
+                              note_id: note.id,
+                              patient_id: note.patient_id,
+                              doctor_id: note.doctor_id,
+                              diagnosis: note.diagnosis ?? "",
+                              recommendations: note.recommendations ?? "",
+                              finalized_at: note.finalized_at,
+                            },
+                          });
+                        }}
+                      >
+                        <FileDown className="mr-2 h-4 w-4" /> PDF
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground">Diagnosis</div>
+                      <Textarea
+                        value={diagnosis}
+                        onChange={(e) => setDiagnosis(e.target.value)}
+                        placeholder="Enter diagnosis (draft)…"
+                        className="mt-2"
+                        disabled={!canEditNote}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground">Recommendations</div>
+                      <Textarea
+                        value={recommendations}
+                        onChange={(e) => setRecommendations(e.target.value)}
+                        placeholder="Enter recommendations (draft)…"
+                        className="mt-2"
+                        disabled={!canEditNote}
+                      />
+                    </div>
+
+                    {note?.is_final ? (
+                      <div className="text-xs text-muted-foreground">
+                        Finalized: {note.finalized_at ? new Date(note.finalized_at).toLocaleString() : "—"}
+                        {noteTxId ? (
+                          <span>
+                            {" "}· tx: <span className="font-mono">{noteTxId}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        className="rounded-xl"
+                        disabled={!canEditNote}
+                        onClick={() => saveDraft(false)}
+                      >
+                        Save draft
+                      </Button>
+                      <Button
+                        variant="hero"
+                        className="rounded-xl"
+                        disabled={!canEditNote}
+                        onClick={() => saveDraft(true)}
+                      >
+                        Finalize & anchor
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="font-semibold">Chat (appointment)</div>
                 <div className="max-h-64 overflow-auto rounded-2xl border bg-card p-4">
                   {messages.length ? (

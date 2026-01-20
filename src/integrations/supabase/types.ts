@@ -14,34 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_notes: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          diagnosis: string | null
+          doctor_id: string
+          finalized_at: string | null
+          id: string
+          is_final: boolean
+          patient_id: string
+          recommendations: string | null
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          diagnosis?: string | null
+          doctor_id: string
+          finalized_at?: string | null
+          id?: string
+          is_final?: boolean
+          patient_id: string
+          recommendations?: string | null
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          diagnosis?: string | null
+          doctor_id?: string
+          finalized_at?: string | null
+          id?: string
+          is_final?: boolean
+          patient_id?: string
+          recommendations?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_notes_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: true
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           created_at: string
           doctor_id: string
+          ended_at: string | null
           id: string
           patient_id: string
           reason: string | null
           scheduled_for: string
+          started_at: string | null
           status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           doctor_id: string
+          ended_at?: string | null
           id?: string
           patient_id: string
           reason?: string | null
           scheduled_for: string
+          started_at?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           doctor_id?: string
+          ended_at?: string | null
           id?: string
           patient_id?: string
           reason?: string | null
           scheduled_for?: string
+          started_at?: string | null
           status?: string
           updated_at?: string
         }
@@ -177,36 +230,56 @@ export type Database = {
       }
       ledger_transactions: {
         Row: {
+          appointment_id: string | null
           created_at: string
           created_by: string
           id: string
+          note_id: string | null
           patient_id: string
           payload_hash: string
-          prediction_id: string
+          prediction_id: string | null
           prev_hash: string | null
           tx_id: string
         }
         Insert: {
+          appointment_id?: string | null
           created_at?: string
           created_by: string
           id?: string
+          note_id?: string | null
           patient_id: string
           payload_hash: string
-          prediction_id: string
+          prediction_id?: string | null
           prev_hash?: string | null
           tx_id: string
         }
         Update: {
+          appointment_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
+          note_id?: string | null
           patient_id?: string
           payload_hash?: string
-          prediction_id?: string
+          prediction_id?: string | null
           prev_hash?: string | null
           tx_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ledger_transactions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_transactions_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_notes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ledger_transactions_prediction_id_fkey"
             columns: ["prediction_id"]

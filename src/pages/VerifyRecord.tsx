@@ -12,7 +12,9 @@ type Tx = {
   payload_hash: string;
   prev_hash: string | null;
   created_at: string;
-  prediction_id: string;
+  prediction_id: string | null;
+  note_id: string | null;
+  appointment_id: string | null;
   patient_id: string;
 };
 
@@ -22,6 +24,16 @@ type Pred = {
   risk_category: string;
   health_score: number;
   input: any;
+};
+
+type Note = {
+  id: string;
+  appointment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  diagnosis: string | null;
+  recommendations: string | null;
+  finalized_at: string | null;
 };
 
 async function sha256(text: string) {
@@ -56,7 +68,7 @@ export default function VerifyRecord() {
 
       const { data: txRow } = await supabase
         .from("ledger_transactions")
-        .select("tx_id,payload_hash,prev_hash,created_at,prediction_id,patient_id")
+        .select("tx_id,payload_hash,prev_hash,created_at,prediction_id,note_id,appointment_id,patient_id")
         .eq("tx_id", txId)
         .maybeSingle();
 
@@ -68,28 +80,62 @@ export default function VerifyRecord() {
 
       setTx(txRow as any);
 
-      const { data: predRow } = await supabase
-        .from("predictions")
-        .select("created_at,risk_percentage,risk_category,health_score,input")
-        .eq("id", (txRow as any).prediction_id)
-        .maybeSingle();
+      // Support verifying either a prediction report OR finalized consultation notes.
+      if ((txRow as any).prediction_id) {
+        const { data: predRow } = await supabase
+          .from("predictions")
+          .select("created_at,risk_percentage,risk_category,health_score,input")
+          .eq("id", (txRow as any).prediction_id)
+          .maybeSingle();
 
-      if (!predRow) {
-        setStatus("no_access");
+        if (!predRow) {
+          setStatus("no_access");
+          return;
+        }
+        setPred(predRow as any);
+
+        const payload = JSON.stringify({
+          input: (predRow as any).input,
+          risk: { risk: (predRow as any).risk_percentage, category: (predRow as any).risk_category },
+          score: (predRow as any).health_score,
+          at: (predRow as any).created_at,
+          patient_id: (txRow as any).patient_id,
+        });
+        const computed = await sha256(payload);
+        setStatus(computed === (txRow as any).payload_hash ? "valid" : "invalid");
         return;
       }
-      setPred(predRow as any);
 
-      const payload = JSON.stringify({
-        input: (predRow as any).input,
-        risk: { risk: (predRow as any).risk_percentage, category: (predRow as any).risk_category },
-        score: (predRow as any).health_score,
-        at: (predRow as any).created_at,
-        patient_id: (txRow as any).patient_id,
-      });
-      const computed = await sha256(payload);
+      if ((txRow as any).note_id) {
+        const { data: noteRow } = await supabase
+          .from("appointment_notes")
+          .select("id,appointment_id,doctor_id,patient_id,diagnosis,recommendations,finalized_at")
+          .eq("id", (txRow as any).note_id)
+          .maybeSingle();
 
-      setStatus(computed === (txRow as any).payload_hash ? "valid" : "invalid");
+        if (!noteRow) {
+          setStatus("no_access");
+          return;
+        }
+
+        const note = noteRow as any;
+        const finalizedAt = note.finalized_at ?? (txRow as any).created_at;
+
+        const payload = JSON.stringify({
+          appointment_id: note.appointment_id,
+          note_id: note.id,
+          patient_id: note.patient_id,
+          doctor_id: note.doctor_id,
+          diagnosis: note.diagnosis ?? "",
+          recommendations: note.recommendations ?? "",
+          finalized_at: finalizedAt,
+        });
+        const computed = await sha256(payload);
+        setStatus(computed === (txRow as any).payload_hash ? "valid" : "invalid");
+        return;
+      }
+
+      setStatus("invalid");
     };
 
     run();
