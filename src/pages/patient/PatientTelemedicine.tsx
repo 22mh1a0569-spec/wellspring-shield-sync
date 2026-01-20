@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { format, startOfDay } from "date-fns";
 import { FileDown } from "lucide-react";
 
@@ -17,6 +17,8 @@ type Appointment = {
   patient_id: string;
   scheduled_for: string;
   status: string;
+  started_at?: string | null;
+  ended_at?: string | null;
   reason: string | null;
 };
 
@@ -35,6 +37,13 @@ type NoteRow = {
   finalized_at: string | null;
 };
 
+function formatTimer(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
 export default function PatientTelemedicine() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -46,6 +55,15 @@ export default function PatientTelemedicine() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [message, setMessage] = useState("");
 
+  const [connectionStatus, setConnectionStatus] = useState<
+    "idle" | "connecting" | "connected" | "disconnected" | "error"
+  >("idle");
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimeoutRef = useRef<number | null>(null);
+  const chatChannelRef = useRef<any>(null);
+
+  const [secondsActive, setSecondsActive] = useState(0);
+
   const [note, setNote] = useState<NoteRow | null>(null);
   const [noteTxId, setNoteTxId] = useState<string | null>(null);
 
@@ -53,7 +71,7 @@ export default function PatientTelemedicine() {
     if (!user?.id) return;
     const { data } = await supabase
       .from("appointments")
-      .select("id,doctor_id,patient_id,scheduled_for,status,reason")
+      .select("id,doctor_id,patient_id,scheduled_for,status,started_at,ended_at,reason")
       .eq("patient_id", user.id)
       .order("scheduled_for", { ascending: true });
     setAppointments((data as any) ?? []);
@@ -68,8 +86,25 @@ export default function PatientTelemedicine() {
       setMessages([]);
       setNote(null);
       setNoteTxId(null);
+      setConnectionStatus("idle");
+      setIsOtherTyping(false);
+      setSecondsActive(0);
       return;
     }
+
+    // Refresh active appointment status periodically (keeps UI in sync without relying on realtime publication)
+    let alive = true;
+    const fetchActive = async () => {
+      const { data } = await supabase
+        .from("appointments")
+        .select("id,doctor_id,patient_id,scheduled_for,status,started_at,ended_at,reason")
+        .eq("id", active.id)
+        .maybeSingle();
+      if (!alive || !data) return;
+      setActive((prev) => (prev?.id === (data as any).id ? ({ ...(prev as any), ...(data as any) } as any) : prev));
+    };
+    fetchActive();
+    const poll = window.setInterval(fetchActive, 5000);
 
     supabase
       .from("chat_messages")
@@ -101,6 +136,8 @@ export default function PatientTelemedicine() {
         setNoteTxId((tx as any)?.tx_id ?? null);
       });
 
+    setConnectionStatus(navigator.onLine ? "connecting" : "disconnected");
+
     const channel = supabase
       .channel(`chat:${active.id}`)
       .on(
@@ -110,9 +147,30 @@ export default function PatientTelemedicine() {
           setMessages((prev) => [...prev, payload.new as any]);
         },
       )
-      .subscribe();
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        if (!payload || payload.userId === user.id) return;
+        setIsOtherTyping(!!payload.isTyping);
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setConnectionStatus(navigator.onLine ? "connected" : "disconnected");
+        else if (status === "CHANNEL_ERROR") setConnectionStatus("error");
+        else if (status === "TIMED_OUT") setConnectionStatus("error");
+        else if (status === "CLOSED") setConnectionStatus("disconnected");
+      });
+
+    chatChannelRef.current = channel;
+
+    const onOnline = () => setConnectionStatus("connecting");
+    const onOffline = () => setConnectionStatus("disconnected");
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
 
     return () => {
+      alive = false;
+      window.clearInterval(poll);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      chatChannelRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [active?.id, user?.id]);
@@ -147,7 +205,7 @@ export default function PatientTelemedicine() {
         scheduled_for: scheduled.toISOString(),
         reason: reason || null,
       })
-      .select("id,doctor_id,patient_id,scheduled_for,status,reason")
+      .select("id,doctor_id,patient_id,scheduled_for,status,started_at,ended_at,reason")
       .single();
 
     if (error) {
@@ -181,6 +239,7 @@ export default function PatientTelemedicine() {
 
   const send = async () => {
     if (!user?.id || !active?.id) return;
+    if (active.status !== "in_consultation") return;
     const text = message.trim();
     if (!text) return;
 
@@ -194,6 +253,24 @@ export default function PatientTelemedicine() {
   };
 
   const today = startOfDay(new Date());
+
+  useEffect(() => {
+    if (!active?.id || active.status !== "in_consultation" || !active.started_at) {
+      setSecondsActive(0);
+      return;
+    }
+
+    const startedMs = Date.parse(active.started_at);
+    if (!Number.isFinite(startedMs)) return;
+
+    const tick = () => {
+      setSecondsActive(Math.max(0, Math.floor((Date.now() - startedMs) / 1000)));
+    };
+
+    tick();
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, [active?.id, active?.status, active?.started_at]);
 
   return (
     <div className="grid gap-6">
@@ -224,31 +301,42 @@ export default function PatientTelemedicine() {
           </CardHeader>
           <CardContent className="grid gap-3">
             {appointments.length ? (
-              appointments.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => setActive(a)}
-                  className={`w-full rounded-2xl border bg-background p-5 text-left shadow-soft transition hover:-translate-y-0.5 ${
-                    active?.id === a.id ? "ring-2 ring-ring" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold">{format(new Date(a.scheduled_for), "PPp")}</div>
-                    <div className="text-xs text-muted-foreground">{a.status}</div>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">Doctor: {a.doctor_id.slice(0, 8)}…</div>
-                  {a.reason ? <div className="mt-2 text-sm">{a.reason}</div> : null}
-                </button>
-              ))
+              appointments.map((a) => {
+                const isActive = active?.id === a.id;
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setActive(a)}
+                    className={`w-full rounded-2xl border bg-background p-5 text-left shadow-soft transition hover:-translate-y-0.5 ${
+                      isActive ? "ring-2 ring-ring" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">{format(new Date(a.scheduled_for), "PPp")}</div>
+                      <div className="text-xs text-muted-foreground">{a.status}</div>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">Doctor: {a.doctor_id.slice(0, 8)}…</div>
+                    {a.reason ? <div className="mt-2 text-sm">{a.reason}</div> : null}
+                  </button>
+                );
+              })
             ) : (
               <div className="rounded-2xl border bg-background p-6 text-sm text-muted-foreground shadow-soft">No appointments yet.</div>
             )}
 
             {active ? (
               <div className="mt-4 grid gap-3 rounded-2xl border bg-background p-5 shadow-soft">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-semibold">Chat (appointment)</div>
-                  <div className="text-xs text-muted-foreground">Status: {active.status}</div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Status: {active.status}</span>
+                    <span>
+                      Connection: {connectionStatus === "connected" ? "Live" : connectionStatus === "connecting" ? "Connecting…" : connectionStatus}
+                    </span>
+                    {active.status === "in_consultation" && active.started_at ? (
+                      <span>Timer: {formatTimer(secondsActive)}</span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="max-h-64 overflow-auto rounded-2xl border bg-card p-4">
                   {messages.length ? (
@@ -271,16 +359,41 @@ export default function PatientTelemedicine() {
                 </div>
 
                 {active.status === "in_consultation" ? (
-                  <div className="flex gap-2">
-                    <Input
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Type a message…"
-                      onKeyDown={(e) => e.key === "Enter" && send()}
-                    />
-                    <Button variant="hero" className="rounded-xl" onClick={send}>
-                      Send
-                    </Button>
+                  <div className="grid gap-2">
+                    {isOtherTyping ? (
+                      <div className="text-xs text-muted-foreground">Doctor is typing…</div>
+                    ) : null}
+                    <div className="flex gap-2">
+                      <Input
+                        value={message}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setMessage(next);
+
+                          const ch = chatChannelRef.current;
+                          if (!ch || !active?.id || !user?.id) return;
+
+                          if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
+                          ch.send({
+                            type: "broadcast",
+                            event: "typing",
+                            payload: { userId: user.id, isTyping: true },
+                          });
+                          typingTimeoutRef.current = window.setTimeout(() => {
+                            ch.send({
+                              type: "broadcast",
+                              event: "typing",
+                              payload: { userId: user.id, isTyping: false },
+                            });
+                          }, 1200);
+                        }}
+                        placeholder="Type a message…"
+                        onKeyDown={(e) => e.key === "Enter" && send()}
+                      />
+                      <Button variant="hero" className="rounded-xl" onClick={send}>
+                        Send
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">
