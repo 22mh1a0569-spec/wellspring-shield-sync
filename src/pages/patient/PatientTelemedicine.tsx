@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { format, startOfDay } from "date-fns";
+import { FileDown } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { downloadConsultationNotesPdf } from "@/lib/pdf/consultationNotesPdf";
 
 type Appointment = {
   id: string;
@@ -22,6 +24,17 @@ type Availability = { doctor_id: string; is_available: boolean };
 
 type Msg = { id: string; sender_id: string; body: string; created_at: string };
 
+type NoteRow = {
+  id: string;
+  appointment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  diagnosis: string | null;
+  recommendations: string | null;
+  is_final: boolean;
+  finalized_at: string | null;
+};
+
 export default function PatientTelemedicine() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -32,6 +45,9 @@ export default function PatientTelemedicine() {
   const [active, setActive] = useState<Appointment | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [message, setMessage] = useState("");
+
+  const [note, setNote] = useState<NoteRow | null>(null);
+  const [noteTxId, setNoteTxId] = useState<string | null>(null);
 
   const refreshAppointments = async () => {
     if (!user?.id) return;
@@ -50,6 +66,8 @@ export default function PatientTelemedicine() {
   useEffect(() => {
     if (!active?.id || !user?.id) {
       setMessages([]);
+      setNote(null);
+      setNoteTxId(null);
       return;
     }
 
@@ -59,6 +77,29 @@ export default function PatientTelemedicine() {
       .eq("appointment_id", active.id)
       .order("created_at", { ascending: true })
       .then(({ data }) => setMessages((data as any) ?? []));
+
+    // Load finalized consultation notes (patient can only read when finalized via RLS)
+    supabase
+      .from("appointment_notes")
+      .select("id,appointment_id,doctor_id,patient_id,diagnosis,recommendations,is_final,finalized_at")
+      .eq("appointment_id", active.id)
+      .maybeSingle()
+      .then(async ({ data }) => {
+        const n = (data as any) as NoteRow | null;
+        setNote(n);
+        if (!n?.id) {
+          setNoteTxId(null);
+          return;
+        }
+        const { data: tx } = await supabase
+          .from("ledger_transactions")
+          .select("tx_id")
+          .eq("note_id", n.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setNoteTxId((tx as any)?.tx_id ?? null);
+      });
 
     const channel = supabase
       .channel(`chat:${active.id}`)
@@ -226,6 +267,58 @@ export default function PatientTelemedicine() {
                   <Button variant="hero" className="rounded-xl" onClick={send}>
                     Send
                   </Button>
+                </div>
+
+                <div className="mt-2 rounded-2xl border bg-card p-4 shadow-soft">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Doctor notes</div>
+                      <div className="text-xs text-muted-foreground">Visible after the doctor finalizes the consultation.</div>
+                    </div>
+                    {note?.is_final && note?.finalized_at ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={() => {
+                          if (!user?.email || !noteTxId) return;
+                          downloadConsultationNotesPdf({
+                            patientLabel: user.email,
+                            txId: noteTxId,
+                            payload: {
+                              appointment_id: note.appointment_id,
+                              note_id: note.id,
+                              patient_id: note.patient_id,
+                              doctor_id: note.doctor_id,
+                              diagnosis: note.diagnosis ?? "",
+                              recommendations: note.recommendations ?? "",
+                              finalized_at: note.finalized_at,
+                            },
+                          });
+                        }}
+                      >
+                        <FileDown className="mr-2 h-4 w-4" /> PDF
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  {note?.is_final ? (
+                    <div className="mt-3 grid gap-3">
+                      <div>
+                        <div className="text-xs font-semibold text-muted-foreground">Diagnosis</div>
+                        <div className="mt-1 text-sm">{note.diagnosis || "—"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-muted-foreground">Recommendations</div>
+                        <div className="mt-1 text-sm">{note.recommendations || "—"}</div>
+                      </div>
+                      {noteTxId ? (
+                        <div className="text-xs text-muted-foreground">Verification tx: <span className="font-mono">{noteTxId}</span></div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-sm text-muted-foreground">No finalized notes for this appointment yet.</div>
+                  )}
                 </div>
               </div>
             ) : null}
