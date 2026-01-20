@@ -161,6 +161,73 @@ export default function DoctorTelemedicine() {
     if (error) toast({ title: "Message failed", description: error.message, variant: "destructive" });
   };
 
+  const startConsultation = async () => {
+    if (!user?.id || !active?.id) return;
+    if (active.status !== "scheduled") return;
+
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: "in_consultation", started_at: nowIso })
+      .eq("id", active.id);
+
+    if (error) {
+      toast({ title: "Could not start", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    await supabase.from("notifications").insert({
+      user_id: active.patient_id,
+      type: "consultation",
+      title: "Consultation started",
+      body: "Your doctor has started the consultation. You can now chat.",
+      href: "/patient/telemedicine",
+    });
+
+    const next = { ...active, status: "in_consultation" };
+    setActive(next);
+    setAppointments((prev) => prev.map((a) => (a.id === next.id ? next : a)));
+    toast({ title: "Consultation started", description: "Patient notified." });
+  };
+
+  const endConsultation = async () => {
+    if (!user?.id || !active?.id) return;
+    if (active.status === "completed") return;
+
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: "completed", ended_at: nowIso })
+      .eq("id", active.id);
+
+    if (error) {
+      toast({ title: "Could not end", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    await supabase.from("notifications").insert([
+      {
+        user_id: active.patient_id,
+        type: "consultation",
+        title: "Consultation ended",
+        body: "Your consultation has ended. Doctor notes will appear once finalized.",
+        href: "/patient/telemedicine",
+      },
+      {
+        user_id: user.id,
+        type: "consultation",
+        title: "Consultation ended",
+        body: `Appointment ${active.id.slice(0, 8)}… marked completed.`,
+        href: "/doctor/telemedicine",
+      },
+    ]);
+
+    const next = { ...active, status: "completed" };
+    setActive(next);
+    setAppointments((prev) => prev.map((a) => (a.id === next.id ? next : a)));
+    toast({ title: "Consultation ended", description: "Notifications sent." });
+  };
+
   const saveDraft = async (finalize: boolean) => {
     if (!user?.id || !active?.id) return;
 
@@ -234,6 +301,27 @@ export default function DoctorTelemedicine() {
         .update({ status: "completed", ended_at: nowIso })
         .eq("id", active.id);
 
+      await supabase.from("notifications").insert([
+        {
+          user_id: active.patient_id,
+          type: "consultation",
+          title: "Doctor notes published",
+          body: "Your consultation notes are now available.",
+          href: "/patient/telemedicine",
+        },
+        {
+          user_id: user.id,
+          type: "consultation",
+          title: "Consultation ended",
+          body: "Notes finalized and published to the patient.",
+          href: "/doctor/telemedicine",
+        },
+      ]);
+
+      const next = { ...active, status: "completed" };
+      setActive(next);
+      setAppointments((prev) => prev.map((a) => (a.id === next.id ? next : a)));
+
       toast({ title: "Finalized", description: "Notes finalized and anchored into the verification ledger." });
     } catch (e: any) {
       toast({ title: "Could not save notes", description: e?.message ?? "Try again", variant: "destructive" });
@@ -290,7 +378,21 @@ export default function DoctorTelemedicine() {
 
             {active ? (
               <div className="mt-4 grid gap-3 rounded-2xl border bg-background p-5 shadow-soft">
-                <div className="font-semibold">Consultation</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold">Consultation</div>
+                  <div className="flex flex-wrap gap-2">
+                    {active.status === "scheduled" ? (
+                      <Button variant="outline" size="sm" className="rounded-xl" onClick={startConsultation}>
+                        Start consultation
+                      </Button>
+                    ) : null}
+                    {active.status === "in_consultation" ? (
+                      <Button variant="outline" size="sm" className="rounded-xl" onClick={endConsultation}>
+                        End consultation
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
 
                 <div className="rounded-2xl border bg-card p-4 shadow-soft">
                   <div className="flex items-center justify-between gap-3">

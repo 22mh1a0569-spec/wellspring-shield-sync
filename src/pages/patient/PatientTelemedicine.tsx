@@ -155,13 +155,22 @@ export default function PatientTelemedicine() {
       return;
     }
 
-    await supabase.from("notifications").insert({
-      user_id: user.id,
-      type: "appointment",
-      title: "Appointment booked",
-      body: `Scheduled for ${format(scheduled, "PP")}`,
-      href: "/patient/telemedicine",
-    });
+    await supabase.from("notifications").insert([
+      {
+        user_id: user.id,
+        type: "appointment",
+        title: "Appointment booked",
+        body: `Scheduled for ${format(scheduled, "PP")}`,
+        href: "/patient/telemedicine",
+      },
+      {
+        user_id: doctorId.trim(),
+        type: "appointment",
+        title: "New appointment booked",
+        body: `Scheduled for ${format(scheduled, "PPp")} · Patient: ${user.id.slice(0, 8)}…`,
+        href: "/doctor/telemedicine",
+      },
+    ]);
 
     toast({ title: "Booked", description: "Appointment scheduled." });
     setDoctorId("");
@@ -237,7 +246,10 @@ export default function PatientTelemedicine() {
 
             {active ? (
               <div className="mt-4 grid gap-3 rounded-2xl border bg-background p-5 shadow-soft">
-                <div className="font-semibold">Chat (appointment)</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold">Chat (appointment)</div>
+                  <div className="text-xs text-muted-foreground">Status: {active.status}</div>
+                </div>
                 <div className="max-h-64 overflow-auto rounded-2xl border bg-card p-4">
                   {messages.length ? (
                     <div className="grid gap-2">
@@ -257,17 +269,25 @@ export default function PatientTelemedicine() {
                     <div className="text-sm text-muted-foreground">No messages yet.</div>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <Input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type a message…"
-                    onKeyDown={(e) => e.key === "Enter" && send()}
-                  />
-                  <Button variant="hero" className="rounded-xl" onClick={send}>
-                    Send
-                  </Button>
-                </div>
+
+                {active.status === "in_consultation" ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Type a message…"
+                      onKeyDown={(e) => e.key === "Enter" && send()}
+                    />
+                    <Button variant="hero" className="rounded-xl" onClick={send}>
+                      Send
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">
+                    Chat will unlock when the doctor starts the consultation.
+                  </div>
+                )}
+
 
                 <div className="mt-2 rounded-2xl border bg-card p-4 shadow-soft">
                   <div className="flex items-center justify-between gap-3">

@@ -28,6 +28,7 @@ type NoteRow = {
   recommendations: string | null;
   is_final: boolean;
   finalized_at: string | null;
+  created_at: string;
 };
 
 function downloadPredictionPdf(opts: {
@@ -77,7 +78,7 @@ export default function PatientRecords() {
 
     supabase
       .from("appointment_notes")
-      .select("id,appointment_id,doctor_id,patient_id,diagnosis,recommendations,is_final,finalized_at")
+      .select("id,appointment_id,doctor_id,patient_id,diagnosis,recommendations,is_final,finalized_at,created_at")
       .eq("patient_id", user.id)
       .eq("is_final", true)
       .order("finalized_at", { ascending: false })
@@ -199,7 +200,7 @@ export default function PatientRecords() {
               {notes.length ? (
                 notes.map((n) => (
                   <TableRow key={n.id}>
-                    <TableCell>{new Date(n.finalized_at ?? n.created_at ?? Date.now()).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(n.finalized_at ?? n.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="font-mono text-xs">{n.doctor_id.slice(0, 8)}…</TableCell>
                     <TableCell className="text-right">
                       <Button
