@@ -54,6 +54,7 @@ export type Database = {
           created_at: string
           id: string
           sender_id: string
+          sender_role: Database["public"]["Enums"]["app_role"] | null
         }
         Insert: {
           appointment_id: string
@@ -61,6 +62,7 @@ export type Database = {
           created_at?: string
           id?: string
           sender_id: string
+          sender_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Update: {
           appointment_id?: string
@@ -68,6 +70,7 @@ export type Database = {
           created_at?: string
           id?: string
           sender_id?: string
+          sender_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Relationships: [
           {
