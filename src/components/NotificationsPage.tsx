@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,8 @@ export default function NotificationsPage({ role }: { role: "doctor" | "patient"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadTimerRef = useRef<number | null>(null);
+
   const unreadCount = useMemo(() => items.filter((n) => !n.is_read).length, [items]);
 
   const load = useCallback(async () => {
@@ -64,6 +66,53 @@ export default function NotificationsPage({ role }: { role: "doctor" | "patient"
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`notifications-inbox:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const next = payload.new as NotificationRow;
+          setItems((prev) => {
+            if (prev.some((x) => x.id === next.id)) return prev;
+            return [next, ...prev].slice(0, 100);
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const next = payload.new as NotificationRow;
+          setItems((prev) => prev.map((x) => (x.id === next.id ? { ...x, ...next } : x)));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const oldRow = payload.old as Partial<NotificationRow>;
+          if (!oldRow?.id) return;
+          setItems((prev) => prev.filter((x) => x.id !== oldRow.id));
+        },
+      )
+      .subscribe((status) => {
+        console.debug("[notifications-inbox] realtime status:", status);
+      });
+
+    // Safety: if we reconnect, do a single refresh.
+    if (loadTimerRef.current) window.clearTimeout(loadTimerRef.current);
+    loadTimerRef.current = window.setTimeout(() => void load(), 250);
+
+    return () => {
+      if (loadTimerRef.current) window.clearTimeout(loadTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [load, user?.id]);
 
   const markAllRead = useCallback(async () => {
     if (!user?.id) return;
