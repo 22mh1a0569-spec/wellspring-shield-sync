@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/Auth";
 import VerifyRecord from "./pages/VerifyRecord";
+import VerifyScan from "./pages/VerifyScan";
 
 import { AuthProvider } from "@/providers/AuthProvider";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -32,6 +33,7 @@ function AnimatedRoutes() {
         <Route path="/auth" element={<AuthPage />} />
 
         <Route path="/verify/:txId" element={<VerifyRecord />} />
+        <Route path="/verify" element={<VerifyScan />} />
 
         <Route
           path="/patient"
