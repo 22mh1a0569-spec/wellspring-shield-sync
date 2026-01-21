@@ -213,22 +213,26 @@ export default function PatientTelemedicine() {
       return;
     }
 
-    await supabase.from("notifications").insert([
-      {
-        user_id: user.id,
-        type: "appointment",
-        title: "Appointment booked",
-        body: `Scheduled for ${format(scheduled, "PP")}`,
-        href: "/patient/telemedicine",
-      },
-      {
-        user_id: doctorId.trim(),
-        type: "appointment",
-        title: "New appointment booked",
-        body: `Scheduled for ${format(scheduled, "PPp")} · Patient: ${user.id.slice(0, 8)}…`,
-        href: "/doctor/telemedicine",
-      },
+    const [{ error: notifySelfErr }, { error: notifyDoctorErr }] = await Promise.all([
+      supabase.rpc("send_notification", {
+        _recipient_id: user.id,
+        _type: "appointment",
+        _title: "Appointment booked",
+        _body: `Scheduled for ${format(scheduled, "PP")}`,
+        _href: "/patient/telemedicine",
+        _appointment_id: (data as any).id,
+      }),
+      supabase.rpc("send_notification", {
+        _recipient_id: doctorId.trim(),
+        _type: "appointment",
+        _title: "New appointment booked",
+        _body: `Scheduled for ${format(scheduled, "PPp")} · Patient: ${user.id.slice(0, 8)}…`,
+        _href: "/doctor/telemedicine",
+        _appointment_id: (data as any).id,
+      }),
     ]);
+    if (notifySelfErr) toast({ title: "Notify failed", description: notifySelfErr.message, variant: "destructive" });
+    if (notifyDoctorErr) toast({ title: "Notify failed", description: notifyDoctorErr.message, variant: "destructive" });
 
     toast({ title: "Booked", description: "Appointment scheduled." });
     setDoctorId("");
