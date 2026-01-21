@@ -289,6 +289,42 @@ export type Database = {
           },
         ]
       }
+      ml_models: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          metrics: Json
+          model_key: string
+          model_type: string
+          params: Json
+          trained_by: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          metrics?: Json
+          model_key: string
+          model_type: string
+          params: Json
+          trained_by: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          metrics?: Json
+          model_key?: string
+          model_type?: string
+          params?: Json
+          trained_by?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -454,6 +490,7 @@ export type Database = {
         }
         Returns: string
       }
+      set_active_ml_model: { Args: { _model_key: string }; Returns: undefined }
     }
     Enums: {
       app_role: "patient" | "doctor"
