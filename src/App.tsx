@@ -21,6 +21,8 @@ import PatientRecords from "@/pages/patient/PatientRecords";
 import PatientVerify from "@/pages/patient/PatientVerify";
 import DoctorDashboard from "@/pages/doctor/DoctorDashboard";
 import DoctorTelemedicine from "@/pages/doctor/DoctorTelemedicine";
+import DoctorNotifications from "@/pages/doctor/DoctorNotifications";
+import PatientNotifications from "@/pages/patient/PatientNotifications";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +99,17 @@ function AnimatedRoutes() {
         />
 
         <Route
+          path="/patient/notifications"
+          element={
+            <ProtectedRoute allow={["patient"]}>
+              <DashboardLayout>
+                <PatientNotifications />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/doctor"
           element={
             <ProtectedRoute allow={["doctor"]}>
@@ -112,6 +125,17 @@ function AnimatedRoutes() {
             <ProtectedRoute allow={["doctor"]}>
               <DashboardLayout>
                 <DoctorTelemedicine />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/doctor/notifications"
+          element={
+            <ProtectedRoute allow={["doctor"]}>
+              <DashboardLayout>
+                <DoctorNotifications />
               </DashboardLayout>
             </ProtectedRoute>
           }
