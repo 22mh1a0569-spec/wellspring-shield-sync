@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import {
   CartesianGrid,
+  Area,
   Legend,
   Line,
   LineChart,
@@ -40,11 +41,66 @@ type MetricRow = {
 };
 
 type TrendPoint = {
+  date: string;
   label: string;
   healthScore: number;
   bloodPressure: number;
   glucose: number;
 };
+
+function TrendsLegend({ payload }: { payload?: { value?: string; color?: string }[] }) {
+  if (!payload?.length) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-3">
+      {payload.map((item) => (
+        <div
+          key={item.value}
+          className="inline-flex items-center gap-2 rounded-full border bg-secondary/40 px-3 py-1 text-xs font-semibold text-foreground"
+        >
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: item.color || "hsl(var(--muted-foreground))" }}
+            aria-hidden="true"
+          />
+          <span className="leading-none">{item.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrendsTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+  if (!active || !payload?.length) return null;
+
+  const p0 = payload[0]?.payload as TrendPoint | undefined;
+  const when = p0?.date ? new Date(p0.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+
+  const getVal = (key: keyof TrendPoint) => {
+    const v = p0?.[key];
+    return typeof v === "number" ? Math.round(v).toLocaleString() : "—";
+  };
+
+  return (
+    <div className="rounded-2xl border bg-background p-3 text-xs shadow-xl">
+      <div className="text-sm font-semibold">{when}</div>
+      <div className="mt-2 grid gap-1.5">
+        <div className="flex items-center justify-between gap-6">
+          <span className="text-muted-foreground">Health Score</span>
+          <span className="font-mono font-semibold tabular-nums">{getVal("healthScore")}</span>
+        </div>
+        <div className="flex items-center justify-between gap-6">
+          <span className="text-muted-foreground">Blood Pressure</span>
+          <span className="font-mono font-semibold tabular-nums">{getVal("bloodPressure")}</span>
+        </div>
+        <div className="flex items-center justify-between gap-6">
+          <span className="text-muted-foreground">Glucose</span>
+          <span className="font-mono font-semibold tabular-nums">{getVal("glucose")}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type PredictionRow = {
   id: string;
@@ -259,6 +315,7 @@ export default function PatientDashboard() {
       const points = (trendRes.data ?? []) as MetricRow[];
       setTrend(
         points.map((m) => ({
+          date: m.recorded_at,
           label: new Date(m.recorded_at).toLocaleDateString(undefined, { month: "short" }),
           healthScore: computeHealthScore(m),
           bloodPressure: m.systolic_bp ?? 120,
@@ -410,43 +467,77 @@ export default function PatientDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trend.length ? trend : [{ label: "Jan", healthScore: 90, bloodPressure: 130, glucose: 105 }]}
-                  margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="healthScore"
-                    name="Health Score"
-                    stroke="hsl(var(--brand-teal))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="bloodPressure"
-                    name="Blood Pressure"
-                    stroke="hsl(var(--brand-orange))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="glucose"
-                    name="Glucose"
-                    stroke="hsl(var(--foreground))"
-                    strokeOpacity={0.55}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {trend.length ? (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trend} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: "Month", position: "insideBottom", offset: -2 }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: "Measurement", angle: -90, position: "insideLeft" }}
+                    />
+                    <Tooltip content={<TrendsTooltip />} />
+                    <Legend verticalAlign="bottom" content={<TrendsLegend />} />
+
+                    {/* Subtle area fill under Health Score */}
+                    <Area
+                      type="monotone"
+                      dataKey="healthScore"
+                      name="Health Score"
+                      stroke="transparent"
+                      fill="hsl(var(--brand-teal))"
+                      fillOpacity={0.12}
+                      isAnimationActive={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="healthScore"
+                      name="Health Score"
+                      stroke="hsl(var(--brand-teal))"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="bloodPressure"
+                      name="Blood Pressure"
+                      stroke="hsl(var(--brand-orange))"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="glucose"
+                      name="Glucose"
+                      stroke="hsl(var(--foreground))"
+                      strokeOpacity={0.55}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="grid min-h-64 place-items-center rounded-2xl border bg-secondary/20 p-6 text-center">
+                <div>
+                  <div className="text-sm font-semibold">No trend data yet.</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Run your first prediction to see analytics.</div>
+                  <Button asChild variant="hero" className="mt-4 rounded-xl">
+                    <Link to="/patient/predict">Run Prediction</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
