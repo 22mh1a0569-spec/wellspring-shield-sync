@@ -417,12 +417,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_ledger_tx_meta_for_doctor: {
+        Args: { _tx_id: string }
+        Returns: {
+          appointment_id: string
+          created_at: string
+          note_id: string
+          patient_id: string
+          prediction_id: string
+          tx_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      request_patient_consent: {
+        Args: { _patient_id: string }
+        Returns: string
       }
     }
     Enums: {
