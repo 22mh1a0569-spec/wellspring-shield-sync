@@ -1,11 +1,13 @@
 import React, { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ShieldCheck } from "lucide-react";
+import { FileDown, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/providers/AuthProvider";
 import { useVerifyRecord } from "@/pages/verify/useVerifyRecord";
+import { downloadConsultationNotesPdf } from "@/lib/pdf/consultationNotesPdf";
+import { downloadPredictionReportPdf } from "@/lib/pdf/predictionReportPdf";
 
 export default function VerifyRecord() {
   const { txId = "" } = useParams();
@@ -13,8 +15,10 @@ export default function VerifyRecord() {
   const {
     tx,
     pred,
+    note,
     meta,
     status,
+    patientLabel,
     requestConsent,
     refresh,
   } = useVerifyRecord({
@@ -46,6 +50,26 @@ export default function VerifyRecord() {
     if (status === "invalid") return { title: "Not verified", desc: "The record does not match the stored hash." };
     return { title: "Verifying…", desc: "Computing hash and validating." };
   }, [status]);
+
+  const reportType = useMemo(() => {
+    if (tx?.prediction_id) return "AI prediction";
+    if (tx?.note_id) return "Consultation";
+    if (meta?.prediction_id) return "AI prediction";
+    if (meta?.note_id) return "Consultation";
+    return "Report";
+  }, [meta?.note_id, meta?.prediction_id, tx?.note_id, tx?.prediction_id]);
+
+  const reportTimestamp = useMemo(() => {
+    const t = tx?.created_at ?? meta?.created_at;
+    return t ? new Date(t).toLocaleString() : "—";
+  }, [meta?.created_at, tx?.created_at]);
+
+  const patientDisplay = useMemo(() => {
+    if (role === "patient") return session?.user?.email ?? "You";
+    if (patientLabel) return patientLabel;
+    const pid = tx?.patient_id ?? meta?.patient_id;
+    return pid ? `${pid.slice(0, 8)}…` : "—";
+  }, [meta?.patient_id, patientLabel, role, session?.user?.email, tx?.patient_id]);
 
   return (
     <div className="min-h-screen bg-hero">
@@ -101,8 +125,35 @@ export default function VerifyRecord() {
 
             {tx ? (
               <div className="rounded-2xl border bg-background p-6 shadow-soft">
-                <div className="text-xs text-muted-foreground">Transaction ID</div>
-                <div className="mt-1 font-mono text-sm">{tx.tx_id}</div>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Patient</div>
+                    <div className="mt-1 text-sm font-semibold">{patientDisplay}</div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Verification</div>
+                    <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold">
+                      <ShieldCheck className="h-4 w-4" /> {status === "valid" ? "Verified" : status === "invalid" ? "Not verified" : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Report type</div>
+                    <div className="mt-1 text-sm font-semibold">{reportType}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Timestamp</div>
+                    <div className="mt-1 text-sm">{reportTimestamp}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Transaction ID</div>
+                    <div className="mt-1 font-mono text-xs">{tx.tx_id}</div>
+                  </div>
+                </div>
+
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <div>
                     <div className="text-xs text-muted-foreground">Payload hash</div>
@@ -113,6 +164,50 @@ export default function VerifyRecord() {
                     <div className="mt-1 break-all font-mono text-xs">{tx.prev_hash ?? "(genesis)"}</div>
                   </div>
                 </div>
+
+                {role === "doctor" ? (
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Button
+                      variant="hero"
+                      className="rounded-xl"
+                      onClick={async () => {
+                        if (!tx || status === "loading") return;
+
+                        if (tx.prediction_id && pred) {
+                          await downloadPredictionReportPdf({
+                            patientLabel: patientDisplay,
+                            prediction: pred,
+                            txId: tx.tx_id,
+                          });
+                          return;
+                        }
+
+                        if (tx.note_id && note?.finalized_at) {
+                          await downloadConsultationNotesPdf({
+                            patientLabel: patientDisplay,
+                            txId: tx.tx_id,
+                            payload: {
+                              appointment_id: note.appointment_id,
+                              note_id: note.id,
+                              patient_id: note.patient_id,
+                              doctor_id: note.doctor_id,
+                              diagnosis: note.diagnosis ?? "",
+                              recommendations: note.recommendations ?? "",
+                              finalized_at: note.finalized_at,
+                            },
+                          });
+                        }
+                      }}
+                      disabled={status !== "valid" && status !== "invalid"}
+                    >
+                      <FileDown className="mr-2 h-4 w-4" /> Download PDF
+                    </Button>
+
+                    <Button asChild variant="outline" className="rounded-xl" disabled={!tx.appointment_id}>
+                      <Link to={`/doctor/telemedicine?appointment=${tx.appointment_id ?? ""}`}>Open telemedicine</Link>
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

@@ -22,6 +22,16 @@ type Pred = {
   input: any;
 };
 
+type Note = {
+  id: string;
+  appointment_id: string;
+  doctor_id: string;
+  patient_id: string;
+  diagnosis: string | null;
+  recommendations: string | null;
+  finalized_at: string | null;
+};
+
 type TxMeta = {
   tx_id: string;
   created_at: string;
@@ -112,8 +122,11 @@ export function useVerifyRecord(params: {
 
   const [tx, setTx] = useState<Tx | null>(null);
   const [pred, setPred] = useState<Pred | null>(null);
+  const [note, setNote] = useState<Note | null>(null);
   const [meta, setMeta] = useState<TxMeta | null>(null);
   const [status, setStatus] = useState<VerifyStatus>("loading");
+
+  const [patientLabel, setPatientLabel] = useState<string | null>(null);
 
   const pollRef = useRef<number | null>(null);
 
@@ -127,7 +140,9 @@ export function useVerifyRecord(params: {
   const run = useCallback(async () => {
     setTx(null);
     setPred(null);
+    setNote(null);
     setMeta(null);
+    setPatientLabel(null);
     stopPolling();
 
     if (authLoading) return;
@@ -160,6 +175,11 @@ export function useVerifyRecord(params: {
 
     setTx(txRow);
 
+    if (role === "doctor") {
+      const { data: label } = await supabase.rpc("get_patient_label_for_doctor", { _patient_id: txRow.patient_id });
+      setPatientLabel((label as any) ?? null);
+    }
+
     if (txRow.prediction_id) {
       const { data: predRow } = await supabase
         .from("predictions")
@@ -191,6 +211,8 @@ export function useVerifyRecord(params: {
         setStatus("no_access");
         return;
       }
+
+      setNote(noteRow as any);
 
       const computed = await sha256(buildNotePayload(noteRow as any, txRow.created_at));
       setStatus(computed === txRow.payload_hash ? "valid" : "invalid");
@@ -226,9 +248,11 @@ export function useVerifyRecord(params: {
   return {
     tx,
     pred,
+    note,
     meta,
     status,
     canShowReport,
+    patientLabel,
     refresh: run,
     requestConsent,
   };
