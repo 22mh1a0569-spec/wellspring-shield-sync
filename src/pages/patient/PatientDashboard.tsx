@@ -535,8 +535,8 @@ export default function PatientDashboard() {
                       name="Health Score"
                       stroke="hsl(var(--brand-teal))"
                       strokeWidth={2.5}
-                      dot={false}
-                      activeDot={{ r: 4 }}
+                      dot={{ r: 2.25, strokeWidth: 0, fill: "hsl(var(--brand-teal))" }}
+                      activeDot={{ r: 4, strokeWidth: 0, fill: "hsl(var(--brand-teal))" }}
                     />
                     <Line
                       type="monotone"
@@ -544,8 +544,8 @@ export default function PatientDashboard() {
                       name="Blood Pressure"
                       stroke="hsl(var(--brand-orange))"
                       strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
+                      dot={{ r: 2.25, strokeWidth: 0, fill: "hsl(var(--brand-orange))" }}
+                      activeDot={{ r: 4, strokeWidth: 0, fill: "hsl(var(--brand-orange))" }}
                     />
                     <Line
                       type="monotone"
@@ -554,8 +554,8 @@ export default function PatientDashboard() {
                       stroke="hsl(var(--foreground))"
                       strokeOpacity={0.55}
                       strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
+                      dot={{ r: 2.25, strokeWidth: 0, fill: "hsl(var(--foreground))" }}
+                      activeDot={{ r: 4, strokeWidth: 0, fill: "hsl(var(--foreground))" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
