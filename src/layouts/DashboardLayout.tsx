@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Bell,
@@ -47,15 +47,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [unread, setUnread] = useState(0);
   const [profile, setProfile] = useState<{ full_name: string | null; avatar_url: string | null } | null>(null);
 
-  useEffect(() => {
+  const unreadTimerRef = useRef<number | null>(null);
+
+  const refreshUnread = useCallback(async () => {
     if (!user?.id) return;
-    supabase
+    const { count } = await supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
-      .eq("is_read", false)
-      .then(({ count }) => setUnread(count ?? 0));
+      .eq("is_read", false);
+    setUnread(count ?? 0);
   }, [user?.id]);
+
+  const scheduleUnreadRefresh = useCallback(() => {
+    if (unreadTimerRef.current) window.clearTimeout(unreadTimerRef.current);
+    unreadTimerRef.current = window.setTimeout(() => {
+      void refreshUnread();
+    }, 150);
+  }, [refreshUnread]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    void refreshUnread();
+
+    const channel = supabase
+      .channel(`notifications-badge:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => scheduleUnreadRefresh(),
+      )
+      .subscribe((status) => {
+        console.debug("[notifications-badge] realtime status:", status);
+      });
+
+    return () => {
+      if (unreadTimerRef.current) window.clearTimeout(unreadTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [refreshUnread, scheduleUnreadRefresh, user?.id]);
 
   useEffect(() => {
     if (!user?.id) {
