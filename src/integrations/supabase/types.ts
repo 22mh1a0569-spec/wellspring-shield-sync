@@ -428,6 +428,10 @@ export type Database = {
           tx_id: string
         }[]
       }
+      get_patient_label_for_doctor: {
+        Args: { _patient_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

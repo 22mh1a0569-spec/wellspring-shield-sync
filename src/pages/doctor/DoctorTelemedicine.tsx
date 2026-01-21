@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { FileDown } from "lucide-react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { useSearchParams } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
@@ -53,6 +54,8 @@ function formatTimer(totalSeconds: number) {
 
 export default function DoctorTelemedicine() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const didAutoOpenRef = useRef(false);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [active, setActive] = useState<Appointment | null>(null);
@@ -88,7 +91,17 @@ export default function DoctorTelemedicine() {
       .select("id,doctor_id,patient_id,scheduled_for,status,started_at,ended_at,reason")
       .eq("doctor_id", user.id)
       .order("scheduled_for", { ascending: true });
-    setAppointments((appts as any) ?? []);
+    const next = ((appts as any) ?? []) as Appointment[];
+    setAppointments(next);
+
+    const requestedId = searchParams.get("appointment");
+    if (requestedId && !didAutoOpenRef.current) {
+      const found = next.find((a) => a.id === requestedId);
+      if (found) {
+        didAutoOpenRef.current = true;
+        setActive(found);
+      }
+    }
   };
 
   useEffect(() => {
