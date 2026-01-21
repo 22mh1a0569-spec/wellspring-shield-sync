@@ -23,6 +23,8 @@ import DoctorDashboard from "@/pages/doctor/DoctorDashboard";
 import DoctorTelemedicine from "@/pages/doctor/DoctorTelemedicine";
 import DoctorNotifications from "@/pages/doctor/DoctorNotifications";
 import PatientNotifications from "@/pages/patient/PatientNotifications";
+import DoctorPredictions from "@/pages/doctor/DoctorPredictions";
+import DoctorConsentRequests from "@/pages/doctor/DoctorConsentRequests";
 
 const queryClient = new QueryClient();
 
@@ -125,6 +127,28 @@ function AnimatedRoutes() {
             <ProtectedRoute allow={["doctor"]}>
               <DashboardLayout>
                 <DoctorTelemedicine />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/doctor/predictions"
+          element={
+            <ProtectedRoute allow={["doctor"]}>
+              <DashboardLayout>
+                <DoctorPredictions />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/doctor/consent-requests"
+          element={
+            <ProtectedRoute allow={["doctor"]}>
+              <DashboardLayout>
+                <DoctorConsentRequests />
               </DashboardLayout>
             </ProtectedRoute>
           }
