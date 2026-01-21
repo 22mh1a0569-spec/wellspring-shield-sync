@@ -25,6 +25,7 @@ import DoctorNotifications from "@/pages/doctor/DoctorNotifications";
 import PatientNotifications from "@/pages/patient/PatientNotifications";
 import DoctorPredictions from "@/pages/doctor/DoctorPredictions";
 import DoctorConsentRequests from "@/pages/doctor/DoctorConsentRequests";
+import DoctorVerify from "@/pages/doctor/DoctorVerify";
 
 const queryClient = new QueryClient();
 
@@ -127,6 +128,28 @@ function AnimatedRoutes() {
             <ProtectedRoute allow={["doctor"]}>
               <DashboardLayout>
                 <DoctorTelemedicine />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/doctor/verify"
+          element={
+            <ProtectedRoute allow={["doctor"]}>
+              <DashboardLayout>
+                <DoctorVerify />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/doctor/verify/:txId"
+          element={
+            <ProtectedRoute allow={["doctor"]}>
+              <DashboardLayout>
+                <VerifyRecord />
               </DashboardLayout>
             </ProtectedRoute>
           }

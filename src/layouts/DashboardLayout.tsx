@@ -77,6 +77,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { to: "/doctor", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
         { to: "/doctor/telemedicine", label: "Telemedicine", icon: <Video className="h-4 w-4" /> },
         { to: "/doctor/predictions", label: "Predictions", icon: <ClipboardCheck className="h-4 w-4" /> },
+        { to: "/doctor/verify", label: "Verify", icon: <ShieldCheck className="h-4 w-4" /> },
       ];
     }
 
@@ -121,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarGroupLabel className="px-1 text-[11px] tracking-wide">Menu</SidebarGroupLabel>
               <SidebarMenu className="gap-1.5">
                 {nav.map((item) => {
-                  const active = location.pathname === item.to;
+                  const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton
