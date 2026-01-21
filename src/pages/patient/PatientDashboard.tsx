@@ -370,7 +370,10 @@ export default function PatientDashboard() {
         { event: "*", schema: "public", table: "health_metrics", filter: `patient_id=eq.${user.id}` },
         () => scheduleRefresh(),
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Debug-only: helps confirm the dashboard is actually subscribed.
+        console.debug("[patient-dashboard] realtime status:", status);
+      });
 
     return () => {
       if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);

@@ -325,6 +325,17 @@ export default function PatientPrediction() {
     try {
       const input = schema.parse(form);
 
+      // Also persist a metrics snapshot so the Patient Dashboard trends can update.
+      // (Trends are based on health_metrics, not predictions.)
+      await supabase.from("health_metrics").insert({
+        patient_id: user.id,
+        heart_rate: input.heart_rate,
+        systolic_bp: input.systolic_bp,
+        diastolic_bp: input.diastolic_bp,
+        glucose_mgdl: input.glucose_mgdl,
+        temperature_c: input.temperature_c,
+      });
+
       const { data: created, error } = await supabase
         .from("predictions")
         .insert({
