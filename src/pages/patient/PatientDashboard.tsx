@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowRight,
@@ -229,6 +229,8 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 export default function PatientDashboard() {
   const { user } = useAuth();
 
+  const refreshTimerRef = useRef<number | null>(null);
+
   const [fullName, setFullName] = useState<string>("");
   const [latest, setLatest] = useState<MetricRow | null>(null);
   const [prev, setPrev] = useState<MetricRow | null>(null);
@@ -279,74 +281,102 @@ export default function PatientDashboard() {
     return tips[idx];
   }, [tips]);
 
+  const fetchDashboardData = useCallback(async () => {
+    if (!user?.id) return;
+
+    const [profileRes, metricsRes, trendRes, predsRes] = await Promise.all([
+      supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
+      supabase
+        .from("health_metrics")
+        .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c,recorded_at")
+        .eq("patient_id", user.id)
+        .order("recorded_at", { ascending: false })
+        .limit(2),
+      supabase
+        .from("health_metrics")
+        .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c,recorded_at")
+        .eq("patient_id", user.id)
+        .order("recorded_at", { ascending: true })
+        .limit(6),
+      supabase
+        .from("predictions")
+        .select("id,created_at,risk_category,risk_percentage,health_score")
+        .eq("patient_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    setFullName(profileRes.data?.full_name ?? user.email?.split("@")[0] ?? "");
+
+    const latestRow = (metricsRes.data?.[0] ?? null) as MetricRow | null;
+    const prevRow = (metricsRes.data?.[1] ?? null) as MetricRow | null;
+    setLatest(latestRow);
+    setPrev(prevRow);
+
+    const points = (trendRes.data ?? []) as MetricRow[];
+    setTrend(
+      points.map((m) => ({
+        date: m.recorded_at,
+        label: new Date(m.recorded_at).toLocaleDateString(undefined, { month: "short" }),
+        healthScore: computeHealthScore(m),
+        bloodPressure: m.systolic_bp ?? 120,
+        glucose: m.glucose_mgdl ?? 95,
+      })),
+    );
+
+    const preds = (predsRes.data ?? []) as PredictionRow[];
+    if (!preds.length) {
+      setHistory([]);
+      return;
+    }
+
+    const predIds = preds.map((p) => p.id);
+    const ledgerRes = await supabase
+      .from("ledger_transactions")
+      .select("prediction_id,tx_id")
+      .in("prediction_id", predIds)
+      .order("created_at", { ascending: false });
+
+    const ledger = (ledgerRes.data ?? []) as LedgerRow[];
+    const txByPrediction = new Map<string, string>();
+    ledger.forEach((l) => {
+      if (!txByPrediction.has(l.prediction_id)) txByPrediction.set(l.prediction_id, l.tx_id);
+    });
+
+    setHistory(preds.map((p) => ({ ...p, tx_id: txByPrediction.get(p.id) ?? null })));
+  }, [user?.email, user?.id]);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = window.setTimeout(() => {
+      fetchDashboardData();
+    }, 250);
+  }, [fetchDashboardData]);
+
   useEffect(() => {
     if (!user?.id) return;
 
-    const run = async () => {
-      const [profileRes, metricsRes, trendRes, predsRes] = await Promise.all([
-        supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
-        supabase
-          .from("health_metrics")
-          .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c,recorded_at")
-          .eq("patient_id", user.id)
-          .order("recorded_at", { ascending: false })
-          .limit(2),
-        supabase
-          .from("health_metrics")
-          .select("heart_rate,systolic_bp,diastolic_bp,glucose_mgdl,temperature_c,recorded_at")
-          .eq("patient_id", user.id)
-          .order("recorded_at", { ascending: true })
-          .limit(6),
-        supabase
-          .from("predictions")
-          .select("id,created_at,risk_category,risk_percentage,health_score")
-          .eq("patient_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
+    fetchDashboardData();
 
-      setFullName(profileRes.data?.full_name ?? user.email?.split("@")[0] ?? "");
+    const channel = supabase
+      .channel(`patient-dashboard:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "predictions", filter: `patient_id=eq.${user.id}` },
+        () => scheduleRefresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "health_metrics", filter: `patient_id=eq.${user.id}` },
+        () => scheduleRefresh(),
+      )
+      .subscribe();
 
-      const latestRow = (metricsRes.data?.[0] ?? null) as MetricRow | null;
-      const prevRow = (metricsRes.data?.[1] ?? null) as MetricRow | null;
-      setLatest(latestRow);
-      setPrev(prevRow);
-
-      const points = (trendRes.data ?? []) as MetricRow[];
-      setTrend(
-        points.map((m) => ({
-          date: m.recorded_at,
-          label: new Date(m.recorded_at).toLocaleDateString(undefined, { month: "short" }),
-          healthScore: computeHealthScore(m),
-          bloodPressure: m.systolic_bp ?? 120,
-          glucose: m.glucose_mgdl ?? 95,
-        })),
-      );
-
-      const preds = (predsRes.data ?? []) as PredictionRow[];
-      if (!preds.length) {
-        setHistory([]);
-        return;
-      }
-
-      const predIds = preds.map((p) => p.id);
-      const ledgerRes = await supabase
-        .from("ledger_transactions")
-        .select("prediction_id,tx_id")
-        .in("prediction_id", predIds)
-        .order("created_at", { ascending: false });
-
-      const ledger = (ledgerRes.data ?? []) as LedgerRow[];
-      const txByPrediction = new Map<string, string>();
-      ledger.forEach((l) => {
-        if (!txByPrediction.has(l.prediction_id)) txByPrediction.set(l.prediction_id, l.tx_id);
-      });
-
-      setHistory(preds.map((p) => ({ ...p, tx_id: txByPrediction.get(p.id) ?? null })));
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(channel);
     };
-
-    run();
-  }, [user?.id]);
+  }, [fetchDashboardData, scheduleRefresh, user?.id]);
 
   const heartDelta = useMemo(() => {
     const txt = formatDelta(latest?.heart_rate, prev?.heart_rate);
