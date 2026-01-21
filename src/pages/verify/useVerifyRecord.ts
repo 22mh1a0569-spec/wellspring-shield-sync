@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AppRole } from "@/providers/AuthProvider";
-import { sha256 } from "./verifyCrypto";
+import { sha256, stableStringify } from "./verifyCrypto";
+
+const PREDICTION_MODEL_VERSION = "prediction_v1";
 
 type Tx = {
   tx_id: string;
@@ -51,12 +53,14 @@ export type VerifyStatus =
   | "consent_pending";
 
 function buildPredictionPayload(tx: Tx, pred: Pred) {
-  return JSON.stringify({
-    input: pred.input,
-    risk: { risk: pred.risk_percentage, category: pred.risk_category },
-    score: pred.health_score,
-    at: pred.created_at,
+  // IMPORTANT: This must match the deterministic payload used when anchoring.
+  // Do not include timestamps, IDs, UI state, or formatting fields.
+  return stableStringify({
     patient_id: tx.patient_id,
+    model_version: PREDICTION_MODEL_VERSION,
+    inputs: pred.input,
+    risk_score: pred.risk_percentage,
+    risk_label: pred.risk_category,
   });
 }
 
@@ -196,6 +200,12 @@ export function useVerifyRecord(params: {
       setPred(predTyped);
 
       const computed = await sha256(buildPredictionPayload(txRow, predTyped));
+      // Debug-only: visible in devtools console.
+      console.debug("[verify] prediction ledger hash", {
+        txId: txRow.tx_id,
+        stored: txRow.payload_hash,
+        computed,
+      });
       setStatus(computed === txRow.payload_hash ? "valid" : "invalid");
       return;
     }

@@ -24,6 +24,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "@/hooks/use-toast";
+import { sha256Hex, stableStringify } from "@/lib/crypto/stableHash";
+
+const PREDICTION_MODEL_VERSION = "prediction_v1";
 
 // NOTE: lightweight deterministic scorer (demo-friendly).
 const schema = z.object({
@@ -93,14 +96,6 @@ function scoreToRisk(score: number) {
   const risk = clamp(100 - score, 0, 100);
   const category = risk < 25 ? "Low" : risk < 60 ? "Medium" : "High";
   return { risk, category };
-}
-
-async function sha256(text: string) {
-  const data = new TextEncoder().encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 async function qrPngDataUrl(value: string) {
@@ -348,8 +343,14 @@ export default function PatientPrediction() {
       setPredictionId(created.id);
 
       // Ledger-style anchoring
-      const payload = JSON.stringify({ input, risk: riskInfo, score, at: new Date().toISOString(), patient_id: user.id });
-      const payloadHash = await sha256(payload);
+      const payload = stableStringify({
+        patient_id: user.id,
+        model_version: PREDICTION_MODEL_VERSION,
+        inputs: input,
+        risk_score: riskInfo.risk,
+        risk_label: riskInfo.category,
+      });
+      const payloadHash = await sha256Hex(payload);
 
       const { data: lastTx } = await supabase
         .from("ledger_transactions")
