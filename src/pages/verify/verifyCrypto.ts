@@ -1,7 +1,3 @@
-export async function sha256(text: string) {
-  const data = new TextEncoder().encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+// Backwards-compatible re-export.
+// Prefer importing from `@/lib/crypto/stableHash` for new code.
+export { sha256Hex as sha256, stableStringify } from "@/lib/crypto/stableHash";
