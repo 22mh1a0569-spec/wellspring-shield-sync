@@ -247,13 +247,19 @@ export default function DoctorTelemedicine() {
       return;
     }
 
-    await supabase.from("notifications").insert({
-      user_id: active.patient_id,
-      type: "consultation",
-      title: "Consultation started",
-      body: "Your doctor has started the consultation. You can now chat.",
-      href: "/patient/telemedicine",
-    });
+    {
+      const { error: notifyErr } = await supabase.rpc("send_notification", {
+        _recipient_id: active.patient_id,
+        _type: "consultation",
+        _title: "Consultation started",
+        _body: "Your doctor has started the consultation. You can now chat.",
+        _href: "/patient/telemedicine",
+        _appointment_id: active.id,
+      });
+      if (notifyErr) {
+        toast({ title: "Notify failed", description: notifyErr.message, variant: "destructive" });
+      }
+    }
 
     const next = { ...active, status: "in_consultation", started_at: nowIso };
     setActive(next);
@@ -276,22 +282,26 @@ export default function DoctorTelemedicine() {
       return;
     }
 
-    await supabase.from("notifications").insert([
-      {
-        user_id: active.patient_id,
-        type: "consultation",
-        title: "Consultation ended",
-        body: "Your consultation has ended. Doctor notes will appear once finalized.",
-        href: "/patient/telemedicine",
-      },
-      {
-        user_id: user.id,
-        type: "consultation",
-        title: "Consultation ended",
-        body: `Appointment ${active.id.slice(0, 8)}… marked completed.`,
-        href: "/doctor/telemedicine",
-      },
+    const [{ error: notifyPatientErr }, { error: notifySelfErr }] = await Promise.all([
+      supabase.rpc("send_notification", {
+        _recipient_id: active.patient_id,
+        _type: "consultation",
+        _title: "Consultation ended",
+        _body: "Your consultation has ended. Doctor notes will appear once finalized.",
+        _href: "/patient/telemedicine",
+        _appointment_id: active.id,
+      }),
+      supabase.rpc("send_notification", {
+        _recipient_id: user.id,
+        _type: "consultation",
+        _title: "Consultation ended",
+        _body: `Appointment ${active.id.slice(0, 8)}… marked completed.`,
+        _href: "/doctor/telemedicine",
+        _appointment_id: active.id,
+      }),
     ]);
+    if (notifyPatientErr) toast({ title: "Notify failed", description: notifyPatientErr.message, variant: "destructive" });
+    if (notifySelfErr) toast({ title: "Notify failed", description: notifySelfErr.message, variant: "destructive" });
 
     const next = { ...active, status: "completed" };
     setActive(next);
@@ -372,22 +382,26 @@ export default function DoctorTelemedicine() {
         .update({ status: "completed", ended_at: nowIso })
         .eq("id", active.id);
 
-      await supabase.from("notifications").insert([
-        {
-          user_id: active.patient_id,
-          type: "consultation",
-          title: "Doctor notes published",
-          body: "Your consultation notes are now available.",
-          href: "/patient/telemedicine",
-        },
-        {
-          user_id: user.id,
-          type: "consultation",
-          title: "Consultation ended",
-          body: "Notes finalized and published to the patient.",
-          href: "/doctor/telemedicine",
-        },
+      const [{ error: pubPatientErr }, { error: pubSelfErr }] = await Promise.all([
+        supabase.rpc("send_notification", {
+          _recipient_id: active.patient_id,
+          _type: "consultation",
+          _title: "Doctor notes published",
+          _body: "Your consultation notes are now available.",
+          _href: "/patient/telemedicine",
+          _appointment_id: active.id,
+        }),
+        supabase.rpc("send_notification", {
+          _recipient_id: user.id,
+          _type: "consultation",
+          _title: "Consultation ended",
+          _body: "Notes finalized and published to the patient.",
+          _href: "/doctor/telemedicine",
+          _appointment_id: active.id,
+        }),
       ]);
+      if (pubPatientErr) toast({ title: "Notify failed", description: pubPatientErr.message, variant: "destructive" });
+      if (pubSelfErr) toast({ title: "Notify failed", description: pubSelfErr.message, variant: "destructive" });
 
       const next = { ...active, status: "completed" };
       setActive(next);

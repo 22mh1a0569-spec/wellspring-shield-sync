@@ -443,6 +443,17 @@ export type Database = {
         Args: { _patient_id: string }
         Returns: string
       }
+      send_notification: {
+        Args: {
+          _appointment_id?: string
+          _body?: string
+          _href?: string
+          _recipient_id: string
+          _title: string
+          _type: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "patient" | "doctor"
