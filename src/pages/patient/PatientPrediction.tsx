@@ -25,6 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "@/hooks/use-toast";
 import { sha256Hex, stableStringify } from "@/lib/crypto/stableHash";
+import { inferLogisticRegression, type LogisticRegressionModel } from "@/lib/ml/logisticRegression";
+import { inferDecisionTree, type DecisionTreeModel } from "@/lib/ml/decisionTree";
 
 const PREDICTION_MODEL_VERSION = "prediction_v1";
 
@@ -48,6 +50,12 @@ const schema = z.object({
 });
 
 type Inputs = z.infer<typeof schema>;
+
+type ActiveMlModel = {
+  model_key: string;
+  model_type: string;
+  params: any;
+};
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -96,6 +104,40 @@ function scoreToRisk(score: number) {
   const risk = clamp(100 - score, 0, 100);
   const category = risk < 25 ? "Low" : risk < 60 ? "Medium" : "High";
   return { risk, category };
+}
+
+function riskFromProbability(p: number) {
+  const risk = clamp(Math.round(clamp(p, 0, 1) * 100), 0, 100);
+  const category = risk < 25 ? "Low" : risk < 60 ? "Medium" : "High";
+  return { risk, category };
+}
+
+function buildFeatureVectorForModel(input: Inputs, featureNames: string[]): number[] | null {
+  // The doctor trainer uses the UCI Cleveland schema. We adapt patient-entered fields into
+  // a best-effort feature vector. If a model expects unknown features, fall back to rule scoring.
+  const map: Record<string, number> = {
+    age: input.age_years,
+    sex: 0,
+    cp: 0,
+    trestbps: input.systolic_bp,
+    chol: input.cholesterol_mgdl,
+    fbs: input.glucose_mgdl > 120 ? 1 : 0,
+    restecg: 0,
+    thalach: input.heart_rate,
+    exang: 0,
+    oldpeak: 0,
+    slope: 0,
+    ca: 0,
+    thal: 0,
+  };
+
+  const x: number[] = [];
+  for (const name of featureNames) {
+    const v = map[name];
+    if (typeof v !== "number" || !Number.isFinite(v)) return null;
+    x.push(v);
+  }
+  return x;
 }
 
 async function qrPngDataUrl(value: string) {
@@ -238,6 +280,8 @@ export default function PatientPrediction() {
   const [remarks, setRemarks] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [activeModel, setActiveModel] = useState<ActiveMlModel | null>(null);
+
   const [form, setForm] = useState<Inputs>({
     age_years: 35,
 
@@ -256,8 +300,73 @@ export default function PatientPrediction() {
     family_history: false,
   });
 
-  const score = useMemo(() => computeScore(form), [form]);
-  const riskInfo = useMemo(() => scoreToRisk(score), [score]);
+  useEffect(() => {
+    if (!user?.id) {
+      setActiveModel(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("ml_models")
+        .select("model_key,model_type,params")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        console.warn("[PatientPrediction] failed to load active model", error);
+        setActiveModel(null);
+        return;
+      }
+      setActiveModel((data as any) ?? null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const ruleScore = useMemo(() => computeScore(form), [form]);
+
+  const mlProbability = useMemo(() => {
+    if (!activeModel?.params) return null;
+
+    try {
+      if (activeModel.model_type === "logistic_regression") {
+        const model = activeModel.params as LogisticRegressionModel;
+        const x = buildFeatureVectorForModel(form, model.featureNames ?? []);
+        if (!x) return null;
+        return inferLogisticRegression(model, x);
+      }
+
+      if (activeModel.model_type === "decision_tree") {
+        const model = activeModel.params as DecisionTreeModel;
+        const x = buildFeatureVectorForModel(form, model.featureNames ?? []);
+        if (!x) return null;
+        return inferDecisionTree(model, x);
+      }
+    } catch (e) {
+      console.warn("[PatientPrediction] ML inference failed; falling back", e);
+    }
+
+    return null;
+  }, [activeModel, form]);
+
+  const score = useMemo(() => {
+    // Keep the existing “health_score” semantics (0-100). When ML is available,
+    // derive score from predicted probability so downstream UI/DB remain consistent.
+    if (mlProbability == null) return ruleScore;
+    return clamp(Math.round((1 - clamp(mlProbability, 0, 1)) * 100), 0, 100);
+  }, [mlProbability, ruleScore]);
+
+  const riskInfo = useMemo(() => {
+    if (mlProbability == null) return scoreToRisk(score);
+    return riskFromProbability(mlProbability);
+  }, [mlProbability, score]);
 
   const [predictionId, setPredictionId] = useState<string | null>(null);
   const [txId, setTxId] = useState<string | null>(null);
