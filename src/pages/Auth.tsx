@@ -41,6 +41,18 @@ function humanizeError(err: unknown): string {
   return msg;
 }
 
+async function fetchUserRole(userId: string): Promise<Role | null> {
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return null;
+  return (data?.role as Role | undefined) ?? null;
+}
+
 function RoleCard({
   active,
   title,
@@ -105,8 +117,7 @@ export default function AuthPage() {
   );
 
   const afterAuthRedirect = async (userId: string) => {
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
-    const nextRole = (data?.role as Role | undefined) ?? "patient";
+    const nextRole = (await fetchUserRole(userId)) ?? "patient";
     nav(nextRole === "doctor" ? "/doctor" : "/patient", { replace: true });
   };
 
@@ -119,7 +130,23 @@ export default function AuthPage() {
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      if (data.user?.id) await afterAuthRedirect(data.user.id);
+
+      const userId = data.user?.id;
+      if (!userId) throw new Error("Sign-in succeeded but no user was returned.");
+
+      // Enforce role match at sign-in to prevent confusion (single account = single role).
+      const storedRole = await fetchUserRole(userId);
+      if (storedRole && storedRole !== role) {
+        await supabase.auth.signOut();
+        setNotice({
+          variant: "destructive",
+          title: "Wrong role selected",
+          description: `This account is registered as ${storedRole}. Please switch to ${storedRole} and sign in again.`,
+        });
+        return;
+      }
+
+      await afterAuthRedirect(userId);
     } catch (e: any) {
       setNotice({
         variant: "destructive",
