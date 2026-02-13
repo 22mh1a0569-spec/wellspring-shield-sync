@@ -1,0 +1,26 @@
+-- Migration 1/2: add new app roles (must be committed before use elsewhere)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public' AND t.typname = 'app_role' AND e.enumlabel = 'admin'
+  ) THEN
+    ALTER TYPE public.app_role ADD VALUE 'admin';
+  END IF;
+END$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public' AND t.typname = 'app_role' AND e.enumlabel = 'laboratory'
+  ) THEN
+    ALTER TYPE public.app_role ADD VALUE 'laboratory';
+  END IF;
+END$$;
