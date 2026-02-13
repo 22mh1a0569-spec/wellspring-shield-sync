@@ -493,7 +493,7 @@ export type Database = {
       set_active_ml_model: { Args: { _model_key: string }; Returns: undefined }
     }
     Enums: {
-      app_role: "patient" | "doctor"
+      app_role: "patient" | "doctor" | "admin" | "laboratory"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -621,7 +621,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["patient", "doctor"],
+      app_role: ["patient", "doctor", "admin", "laboratory"],
     },
   },
 } as const
