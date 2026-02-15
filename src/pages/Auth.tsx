@@ -121,6 +121,62 @@ export default function AuthPage() {
     nav(nextRole === "doctor" ? "/doctor" : "/patient", { replace: true });
   };
 
+  const readRoleFromMetadata = (u: { user_metadata?: any } | null | undefined): Role | null => {
+    const raw = u?.user_metadata?.role;
+    if (raw === "patient" || raw === "doctor") return raw;
+    return null;
+  };
+
+  const ensureRoleAndProfile = async (args: {
+    userId: string;
+    selectedRole: Role;
+    authUser: any;
+  }) => {
+    // If role row doesn't exist (common when signup happens before email confirmation),
+    // create it from immutable signup metadata.
+    const existingRole = await fetchUserRole(args.userId);
+    if (existingRole) return existingRole;
+
+    const metaRole = readRoleFromMetadata(args.authUser);
+    if (!metaRole) {
+      throw new Error(
+        "Your account is missing a role assignment. Please complete signup again (or contact support).",
+      );
+    }
+
+    if (metaRole !== args.selectedRole) {
+      throw new Error(
+        `This account is registered as ${metaRole}. Please switch to ${metaRole} and sign in again.`,
+      );
+    }
+
+    // Create role + profile from metadata (safe because user is authenticated now).
+    const fullNameFromMeta = (args.authUser?.user_metadata?.full_name as string | undefined) ?? null;
+    const specializationFromMeta =
+      metaRole === "doctor"
+        ? ((args.authUser?.user_metadata?.specialization as string | undefined) ?? null)
+        : null;
+
+    const { error: roleErr } = await supabase.from("user_roles").insert({ user_id: args.userId, role: metaRole });
+    if (roleErr) throw roleErr;
+
+    const { error: profileErr } = await supabase.from("profiles").upsert({
+      user_id: args.userId,
+      full_name: fullNameFromMeta,
+      specialization: specializationFromMeta,
+    });
+    if (profileErr) throw profileErr;
+
+    if (metaRole === "doctor") {
+      const { error: availErr } = await supabase
+        .from("doctor_availability")
+        .upsert({ doctor_id: args.userId, is_available: true });
+      if (availErr) throw availErr;
+    }
+
+    return metaRole;
+  };
+
   const onLogin = async () => {
     setBusy(true);
     setNotice(null);
@@ -134,24 +190,19 @@ export default function AuthPage() {
       const userId = data.user?.id;
       if (!userId) throw new Error("Sign-in succeeded but no user was returned.");
 
-      // Enforce role match at sign-in to prevent confusion (single account = single role).
-      const storedRole = await fetchUserRole(userId);
-      if (storedRole && storedRole !== role) {
-        await supabase.auth.signOut();
-        setNotice({
-          variant: "destructive",
-          title: "Wrong role selected",
-          description: `This account is registered as ${storedRole}. Please switch to ${storedRole} and sign in again.`,
-        });
-        return;
+      const resolvedRole = await ensureRoleAndProfile({ userId, selectedRole: role, authUser: data.user });
+      nav(resolvedRole === "doctor" ? "/doctor" : "/patient", { replace: true });
+    } catch (e: any) {
+      // If we threw a role mismatch error after sign-in, sign out to avoid partial session confusion.
+      const msg = humanizeError(e);
+      if (msg.toLowerCase().includes("registered as")) {
+        await supabase.auth.signOut().catch(() => undefined);
       }
 
-      await afterAuthRedirect(userId);
-    } catch (e: any) {
       setNotice({
         variant: "destructive",
         title: "Sign in failed",
-        description: humanizeError(e),
+        description: msg,
       });
     } finally {
       setBusy(false);
@@ -169,34 +220,34 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: redirectUrl },
+        options: {
+          emailRedirectTo: redirectUrl,
+          // Persist intended role/profile in auth metadata so we can finalize DB rows
+          // after email confirmation (when the user is authenticated).
+          data: {
+            role,
+            full_name: fullName || null,
+            specialization: role === "doctor" ? specialization || null : null,
+          },
+        },
       });
       if (error) throw error;
 
       const userId = data.user?.id;
-      if (!userId) {
+      // If email confirmation is enabled, there is no session yet and RLS will block DB writes.
+      // We finalize `user_roles`/`profiles` on the user's first successful login.
+      if (!userId || !data.session) {
         setNotice({
           variant: "default",
           title: "Check your email",
-          description: "Finish signup using the link we sent.",
+          description: "Finish signup using the link we sent, then sign in.",
         });
         return;
       }
 
-      await supabase.from("profiles").upsert({
-        user_id: userId,
-        full_name: fullName || null,
-        specialization: role === "doctor" ? specialization || null : null,
-      });
-
-      const { error: roleErr } = await supabase.from("user_roles").insert({ user_id: userId, role });
-      if (roleErr) throw roleErr;
-
-      if (role === "doctor") {
-        await supabase.from("doctor_availability").upsert({ doctor_id: userId, is_available: true });
-      }
-
-      await afterAuthRedirect(userId);
+      // If a session exists (auto-confirm), we can finalize immediately.
+      const resolvedRole = await ensureRoleAndProfile({ userId, selectedRole: role, authUser: data.user });
+      nav(resolvedRole === "doctor" ? "/doctor" : "/patient", { replace: true });
     } catch (e: any) {
       setNotice({
         variant: "destructive",
