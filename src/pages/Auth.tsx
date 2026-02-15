@@ -145,6 +145,18 @@ export default function AuthPage() {
 
     // If role row doesn't exist (common when signup happens before email confirmation),
     // create it from immutable signup metadata.
+    const metaRole = readRoleFromMetadata(args.authUser);
+    if (!metaRole) {
+      throw new Error(
+        "Your account is missing a role assignment. Please complete signup again (or contact support).",
+      );
+    }
+
+    if (metaRole !== args.selectedRole) {
+      throw new Error(
+        `This account is registered as ${metaRole}. Please switch to ${metaRole} and sign in again.`,
+      );
+    }
 
     // Create role + profile from metadata (safe because user is authenticated now).
     const fullNameFromMeta = (args.authUser?.user_metadata?.full_name as string | undefined) ?? null;
